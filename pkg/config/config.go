@@ -8,8 +8,9 @@ import (
 )
 
 type AppConfig struct {
-	Dsn    string
-	DbName string
+	Environment string
+	Dsn         string
+	DbName      string
 }
 
 func Load(envFile string) AppConfig {
@@ -30,7 +31,8 @@ func Load(envFile string) AppConfig {
 	}
 
 	return AppConfig{
-		Dsn:    cfgMap.MustGet("dsn").(string),
-		DbName: cfgMap.MustGet("db_name").(string),
+		Environment: env,
+		Dsn:         cfgMap.MustGet("dsn").(string),
+		DbName:      cfgMap.MustGet("db_name").(string),
 	}
 }

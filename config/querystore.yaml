@@ -1,0 +1,15 @@
+- table: users
+  query_file:
+    - ./core/users/queries.sql
+
+- table: file_metadatas
+  query_file:
+    - ./core/files/queries.metadata.sql
+
+- table: user_files
+  query_file:
+    - ./core/files/user_files.queries.sql
+
+- table: tokens
+  query_file:
+    - ./core/tokens/queries.sql

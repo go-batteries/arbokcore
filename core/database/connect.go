@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -28,7 +29,7 @@ func ConnectSqlite(dbName string) *Sqlite {
 	}
 }
 
-func (sqlite *Sqlite) Connect(ctx context.Context) {
+func (sqlite *Sqlite) Connect(ctx context.Context) *sqlx.DB {
 	db, err := sqlx.Connect(sqlite.dsn, sqlite.dbName)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to sqlite")
@@ -42,14 +43,30 @@ func (sqlite *Sqlite) Connect(ctx context.Context) {
 	if err := sqlite.conn.Ping(); err != nil {
 		log.Fatal().Err(err).Msg("failed to reach to sqlite")
 	}
+
+	return db
+}
+
+func (sqlite *Sqlite) GetConn() (*sqlx.DB, error) {
+	if sqlite.conn == nil {
+		return nil, errors.New("uninitialized")
+	}
+
+	return sqlite.conn, nil
 }
 
 const MigrationDir = "./migrations/sqlite"
 
-func (sqlite *Sqlite) Setup(ctx context.Context) error {
+func (sqlite *Sqlite) Setup(ctx context.Context, up bool) error {
 	var err error
 
-	schemaFile := fmt.Sprintf("%s/schema.up.sql", MigrationDir)
+	var schemaFile string
+
+	if up {
+		schemaFile = fmt.Sprintf("%s/schema.up.sql", MigrationDir)
+	} else {
+		schemaFile = fmt.Sprintf("%s/schema.down.sql", MigrationDir)
+	}
 
 	data, err := os.ReadFile(schemaFile)
 	if err != nil {

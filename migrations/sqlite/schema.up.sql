@@ -1,35 +1,55 @@
-CREATE TABLE file_metadata (
-    id VARCHAR(48) PRIMARY KEY
-    ,user_id VARCHAR(48)
-    ,filename TEXT NOT NULL
-    ,file_size INTEGER
-    ,file_type VARCHAR(100)
-    ,filehash VARCHAR(255)
-    ,chunks INTEGER
-    ,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS file_metadatas (
+	id VARCHAR(48) PRIMARY KEY
+	,user_id VARCHAR(48)
+	,file_name TEXT NOT NULL
+	,file_size INTEGER
+	,file_type VARCHAR(100)
+	,file_hash VARCHAR(255)
+	,chunks INTEGER
+	,upload_status VARCHAR(30) DEFAULT 'uploading'
+	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 ---
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
 	id VARCHAR(48) PRIMARY KEY
+	,user_type VARCHAR(20) NOT NULL
 	,email TEXT NOT NULL
 	,hashedpass TEXT
+	,blocked TINYINT DEFAULT 0
 	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 ---
 
-CREATE TABLE user_files (
+CREATE TABLE IF NOT EXISTS user_files (
 	user_id VARCHAR(48)
 	,file_id VARCHAR(48) NOT NULL
 	,chunk_id INTEGER NOT NULL
+	,next_chunk_id INTEGER
 	,chunk_blob_url TEXT NOT NULL
 	,chunk_hash TEXT NOT NULL
+	,version INTEGER DEFAULT 1
 	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+---
+
+CREATE TABLE IF NOT EXISTS tokens (
+	resource_id VARCHAR(48) NOT NULL
+	,resource_type VARCHAR(20)
+	,user_id VARCHAR(48)
+	,access_token VARCHAR(64)
+	,refresh_token VARCHAR(64)
+	,token_type VARCHAR(20)
+	,access_expires_at TIMESTAMP NOT NULL 
+	,refresh_expires_at TIMESTAMP NOT NULL
+	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 ---
