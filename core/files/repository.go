@@ -220,3 +220,63 @@ func (slf *MetadataTokenRepository) CreateMetadataToken(
 
 	return nil
 }
+
+// Like Create, It updates the metadata info and creates a new stream token
+func (slf *MetadataTokenRepository) UpdateMetadataToken(
+	ctx context.Context,
+	metadata *FileMetadata,
+	token *tokens.Token,
+) (err error) {
+
+	log.Info().Msg("update file metadata request and create stream token")
+
+	metaCreateStmt, ok := slf.metaQuerier.GetQuery(UpdateFileMetadataStmt)
+	if !ok {
+		log.Error().Msg("failed to create metadata update stmt")
+		return ErrorStmtNotFound
+	}
+
+	tokenStmt, ok := slf.tokenQuerier.GetQuery(tokens.CreateTokenStmt)
+	if !ok {
+		log.Error().Msg("failed to create tokens stmt")
+		return ErrorStmtNotFound
+	}
+
+	// Create the tokens and file metadatas in a transaction
+	tx, err := slf.conn.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.NamedExecContext(
+		ctx,
+		metaCreateStmt,
+		metadata,
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to update file metadata")
+		tx.Rollback()
+		return err
+	}
+
+	_, err = tx.NamedExecContext(
+		ctx,
+		tokenStmt,
+		token,
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create tokens for stream")
+		tx.Rollback()
+
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error().Err(err).Msg("failed to create metadata or tokens")
+		return err
+	}
+
+	log.Info().Msg("metadata and tokens created successfully")
+
+	return nil
+}

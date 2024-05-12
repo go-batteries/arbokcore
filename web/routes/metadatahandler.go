@@ -109,7 +109,15 @@ func (handler *MetadataHandler) UpdateFileMetadata(c echo.Context) error {
 
 	ctx := c.Request().Context()
 
+	//TODO: validate if user has file access
 	//TODO: validate request struct
+	token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
+	if !ok {
+		log.Error().Msg("current token is not set")
+		return c.NoContent(http.StatusForbidden)
+	}
+	req.UserID = token.ResouceID
+
 	resp := handler.FileSvc.UpdateFileMetadata(ctx, req)
 	if resp.Success {
 		return c.JSON(http.StatusOK, resp)

@@ -75,4 +75,5 @@ SET
 	,chunks = :chunks
 	,updated_at = :updated_at
 WHERE
-	id = :id;
+	id = :id
+AND user_id = :user_id;

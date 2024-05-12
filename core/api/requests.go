@@ -53,9 +53,11 @@ type FileChunkRequest struct {
 }
 
 type FileUpdateMetadataRequest struct {
+	FileName     string `json:"fileName"`
 	FileID       string `json:"fileID"`
 	Digest       string `json:"digest"`
 	Chunks       int64  `json:"chunks"`
 	FileSize     int64  `json:"fileSize"`
 	UploadStatus string `json:"-"`
+	UserID       string `json:"-"`
 }

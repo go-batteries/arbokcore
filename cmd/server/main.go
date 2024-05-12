@@ -104,7 +104,7 @@ func main() {
 
 	e.PATCH("/my/files/:fileID",
 		metadataHandler.UpdateFileMetadata,
-		authsvc.ValidateStreamToken,
+		authsvc.ValidateAccessToken,
 	)
 
 	e.POST("/my/files",

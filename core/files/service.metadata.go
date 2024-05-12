@@ -6,6 +6,7 @@ import (
 	"arbokcore/core/tokens"
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -105,6 +106,8 @@ func (ms *MetadataService) UpdateFileMetadata(
 	req *api.FileUpdateMetadataRequest,
 ) api.Response {
 
+	// So here the update also needs to
+	// Create a new token and return the same response as Create
 	chunks := CalculateChunks(req.FileSize)
 	if chunks != int(req.Chunks) {
 		return api.BuildResponse(
@@ -116,6 +119,7 @@ func (ms *MetadataService) UpdateFileMetadata(
 	log.Info().Msg("updating file metadata")
 	metadata := &FileMetadata{
 		ID:          req.FileID,
+		UserID:      req.UserID,
 		FileSize:    req.FileSize,
 		FileHash:    req.Digest,
 		NChunks:     int(req.Chunks),
@@ -125,13 +129,40 @@ func (ms *MetadataService) UpdateFileMetadata(
 		},
 	}
 
-	err := ms.repo.Update(ctx, metadata)
+	fmt.Printf("updated metadata %+v\n", metadata)
+
+	token, err := tokens.NewToken(
+		metadata.ID, tokens.ResourceTypeStream,
+		tokens.WithDefaultExpiry(),
+		tokens.WithUserID(&req.UserID),
+	)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to update file metadata")
-		return api.BuildResponse(err, nil)
+		log.Error().Err(err).Msg("failed to initialize token")
+		return api.BuildResponse(
+			errors.New("internal_server_error:2011:500"),
+			nil,
+		)
 	}
 
-	return api.BuildResponse(nil, map[string]any{"id": req.FileID, "upload": true})
+	if err := ms.metaTokensRepo.UpdateMetadataToken(
+		ctx,
+		metadata,
+		token,
+	); err != nil {
+		log.Error().Err(err).Msg("failed to create metadata and token")
+		return api.BuildResponse(
+			errors.New("internal_server_error:2011:500"),
+			nil,
+		)
+	}
+
+	return api.BuildResponse(nil, &MetadataTokenResponse{
+		StreamToken: token.AccessToken,
+		FileID:      metadata.ID,
+		CreatedAt:   token.CreatedAt,
+		ExpiresIn:   tokens.ShortExpiryDuration,
+	})
+
 }
 
 type FileInfoResponse struct {
