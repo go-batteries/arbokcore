@@ -43,6 +43,18 @@ func (ms *MetadataService) PrepareFileForUpload(
 
 	chunks := CalculateChunks(req.FileSize)
 
+	found, err := ms.repo.FindByHash(ctx, req.Digest)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to execute query")
+
+		if found {
+			err = ErrDuplicateFile
+		}
+	}
+	if err != nil {
+		return api.BuildResponse(errors.New("duplicate:2014:422"), nil)
+	}
+
 	id, err := database.NewID()
 	if err != nil {
 		log.Error().Err(err).Msg("faild to generate ulid")
