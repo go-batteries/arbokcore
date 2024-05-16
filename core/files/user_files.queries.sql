@@ -7,7 +7,6 @@ INSERT INTO user_files (
 	,next_chunk_id
 	,chunk_blob_url
 	,chunk_hash
-	,version
 	,created_at
 	,updated_at
 ) VALUES (
@@ -17,7 +16,6 @@ INSERT INTO user_files (
 	,:next_chunk_id
 	,:chunk_blob_url
 	,:chunk_hash
-	,:version
 	,:created_at
 	,:updated_at
 );
@@ -29,7 +27,6 @@ SELECT
 	,next_chunk_id
 	,chunk_blob_url
 	,chunk_hash
-	,version
 	,created_at
 	,updated_at
 FROM user_files
@@ -45,11 +42,11 @@ SELECT
 	,next_chunk_id
 	,chunk_blob_url
 	,chunk_hash
-	,version
 	,created_at
 	,updated_at
 FROM user_files
-WHERE file_id = :file_id;
+WHERE file_id = :file_id
+ORDER BY created_at  DESC;
 
 --sql:GetFilesChunks
 
@@ -59,8 +56,8 @@ SELECT
 	,next_chunk_id
 	,chunk_blob_url
 	,chunk_hash
-	,version
 	,created_at
 	,updated_at
 FROM user_files
-WHERE file_id IN (:file_ids);
+WHERE file_id IN (:file_ids)
+ORDER BY chunk_id DESC;

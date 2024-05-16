@@ -4,7 +4,10 @@ import (
 	"arbokcore/core/api"
 	"arbokcore/core/database"
 	"arbokcore/core/tokens"
+	"arbokcore/pkg/queuer"
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"time"
@@ -15,16 +18,19 @@ import (
 type MetadataService struct {
 	repo           *MetadataRepository
 	metaTokensRepo *MetadataTokenRepository
+	queue          queuer.Queuer
 }
 
 func NewMetadataService(
 	repo *MetadataRepository,
 	metaTokensRepo *MetadataTokenRepository,
+	queue queuer.Queuer,
 ) *MetadataService {
 
 	return &MetadataService{
 		repo:           repo,
 		metaTokensRepo: metaTokensRepo,
+		queue:          queue,
 	}
 }
 
@@ -57,6 +63,7 @@ func (ms *MetadataService) PrepareFileForUpload(
 		FileHash:    req.Digest,
 		NChunks:     int(chunks),
 		UploadStaus: req.UploadStatus,
+		CurrentFlag: false,
 		Timestamp:   database.NewTimestamp(),
 	}
 
@@ -85,20 +92,42 @@ func (ms *MetadataService) PrepareFileForUpload(
 		)
 	}
 
+	qdata := CacheMetadata{
+		PrevID: nil,
+		ID:     metadata.ID,
+	}
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+
+	err = enc.Encode(qdata)
+	if err == nil {
+		err = ms.queue.EnqueueMsg(ctx, &queuer.Payload{
+			Message: buf.Bytes(),
+		})
+	}
+
+	if err != nil {
+		log.Error().Err(err).Msg("failed to encode or enqueue message")
+	}
+
 	return api.BuildResponse(nil, &MetadataTokenResponse{
-		StreamToken: token.AccessToken,
-		FileID:      id,
-		CreatedAt:   token.CreatedAt,
-		ExpiresIn:   tokens.ShortExpiryDuration,
+		StreamToken:  token.AccessToken,
+		FileID:       id,
+		UploadStatus: StatusUploading,
+		CreatedAt:    token.CreatedAt,
+		ExpiresIn:    tokens.ShortExpiryDuration,
 	})
 }
 
+// FIX: this
 type MetadataTokenResponse struct {
-	AccessToken string        `json:"accessToken,omitempty"`
-	StreamToken string        `json:"streamToken,omitempty"`
-	FileID      string        `json:"fileID"`
-	CreatedAt   time.Time     `json:"createdAt"`
-	ExpiresIn   time.Duration `json:"expiresAt"`
+	AccessToken  string        `json:"accessToken,omitempty"`
+	StreamToken  string        `json:"streamToken,omitempty"`
+	FileID       string        `json:"fileID"`
+	UploadStatus string        `json:"uploadStatus"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	ExpiresIn    time.Duration `json:"expiresAt"`
 }
 
 func (ms *MetadataService) UpdateFileMetadata(
@@ -157,22 +186,23 @@ func (ms *MetadataService) UpdateFileMetadata(
 	}
 
 	return api.BuildResponse(nil, &MetadataTokenResponse{
-		StreamToken: token.AccessToken,
-		FileID:      metadata.ID,
-		CreatedAt:   token.CreatedAt,
-		ExpiresIn:   tokens.ShortExpiryDuration,
+		StreamToken:  token.AccessToken,
+		FileID:       metadata.ID,
+		CreatedAt:    token.CreatedAt,
+		UploadStatus: StatusUploading,
+		ExpiresIn:    tokens.ShortExpiryDuration,
 	})
-
 }
 
 type FileInfoResponse struct {
-	ID   string `json:"fileID"`
-	Name string `json:"fileName"`
-	Hash string `json:"fileHash"`
-	Size int64  `json:"fileSize"`
-	Type string `json:"fileType"`
+	ID          string `json:"fileID"`
+	Name        string `json:"fileName"`
+	Hash        string `json:"fileHash"`
+	Size        int64  `json:"fileSize"`
+	Type        string `json:"fileType"`
+	CurrentFlag bool   `json:"currentFlag"`
 
-	Chunks []*FilesWithChunks `json:"chunks"`
+	VersionChunks map[string][]*FilesWithChunks `json:"chunks"`
 }
 
 type Response struct {
@@ -217,23 +247,35 @@ func BuildFilesInfoResponse(files []*FilesWithChunks) []*FileInfoResponse {
 
 	for _, file := range files {
 		fileInfo := &FileInfoResponse{
-			ID:   file.ID,
-			Name: file.Filename,
-			Hash: file.FileHash,
-			Size: file.FileSize,
-			Type: file.FileType,
+			ID:          file.ID,
+			Name:        file.Filename,
+			Hash:        file.FileHash,
+			Size:        file.FileSize,
+			Type:        file.FileType,
+			CurrentFlag: file.CurrentFlag,
 
-			Chunks: []*FilesWithChunks{file},
+			VersionChunks: make(map[string][]*FilesWithChunks),
 		}
+
+		// We are using string here, so that going forward
+		// If we want we can change the chunk_id to be a generated id
+		// instead of number.
+		versionStr := fmt.Sprintf("%d", file.ChunkID)
 
 		arrayIDx, ok := filesSeenIndex[file.ID]
 		if !ok {
 			filesSeenIndex[file.ID] = i
+			fileInfo.VersionChunks[versionStr] = []*FilesWithChunks{file}
 			filesInfo = append(filesInfo, fileInfo)
 			i += 1
 		} else {
 			f := filesInfo[arrayIDx]
-			f.Chunks = append(f.Chunks, file)
+
+			if _, ok := f.VersionChunks[versionStr]; !ok {
+				f.VersionChunks[versionStr] = []*FilesWithChunks{file}
+			} else {
+				f.VersionChunks[versionStr] = append(f.VersionChunks[versionStr], file)
+			}
 		}
 	}
 

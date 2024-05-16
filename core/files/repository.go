@@ -1,8 +1,10 @@
 package files
 
 import (
+	"arbokcore/core/database"
 	"arbokcore/core/tokens"
 	"arbokcore/pkg/squirtle"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -19,7 +21,8 @@ type MetadataRepository struct {
 const (
 	CreateFileMetadataStmt = "CreateFileMetadata"
 	GetFilesForUserStmt    = "GetFilesForUser"
-	UpdateFileMetadataStmt = "UpdateFileMetadata"
+	UpdateCurrentFlagStmt  = "UpdateCurrentFlag"
+	FindByHashStmt         = "FindByHash"
 
 	InsertFileChunk = "InsertFileChunk"
 	GetChunksByFile = "GetChunksByFile"
@@ -32,17 +35,6 @@ func NewMetadataRepository(conn *sqlx.DB, querier squirtle.QueryMapper) *Metadat
 	}
 }
 
-// TODO: maybe move the request response objects
-// to separate file
-// Moving all of them into an api/
-// would also work.
-// There are pros and cons of both
-// For pros, using a separate api/ directory
-// would reduce any chance of entering a import cycle
-// but then it reduces locality, so for file handling
-// the api request response would be in a separate place
-// than the files/ directory.
-// We will see about this later. Its not as important rn
 type MetadataRequest struct {
 	UserID       string `json:"-"`
 	FileName     string `json:"fileName"`
@@ -54,17 +46,17 @@ type MetadataRequest struct {
 	AccessToken  string `json:"-"`
 }
 
-func (mr *MetadataRepository) Create(
+func (slf *MetadataRepository) Create(
 	ctx context.Context,
 	metadata *FileMetadata,
 ) (*FileMetadata, error) {
 
-	stmt, ok := mr.querier.GetQuery(CreateFileMetadataStmt)
+	stmt, ok := slf.querier.GetQuery(CreateFileMetadataStmt)
 	if !ok {
 		return nil, errors.New("query_retriever_failed:2001:500")
 	}
 
-	_, err := mr.conn.NamedExecContext(ctx, stmt, metadata)
+	_, err := slf.conn.NamedExecContext(ctx, stmt, metadata)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to insert into database")
 		return nil, errors.New("token_generation_failed:2003:500")
@@ -73,31 +65,104 @@ func (mr *MetadataRepository) Create(
 	return metadata, nil
 }
 
-func (mr *MetadataRepository) Update(
-	ctx context.Context,
-	metadata *FileMetadata,
-) error {
+var (
+	ErrDuplicateFile = errors.New("duplicate_file")
+)
 
-	stmt, ok := mr.querier.GetQuery(UpdateFileMetadataStmt)
+func (slf *MetadataRepository) FindByHash(
+	ctx context.Context,
+	hashStr string,
+) (bool, error) {
+
+	log.Info().Msg("finding by hash")
+
+	stmt, ok := slf.querier.GetQuery(FindByHashStmt)
 	if !ok {
-		return errors.New("query_retriever_failed:2004:500")
+		return false, ErrorStmtNotFound
 	}
 
-	_, err := mr.conn.NamedExecContext(
+	var found int64
+
+	err := slf.conn.GetContext(
 		ctx,
+		&found,
 		stmt,
-		metadata,
+		hashStr,
 	)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to update file metadata info")
+		log.Error().Err(err).Msg("failed to find by hash")
+		return false, nil
 	}
 
-	return err
+	return true, ErrDuplicateFile
+}
+
+func (mr *MetadataRepository) Update(
+	ctx context.Context,
+	prevFileID *string,
+	newFileID string,
+) (err error) {
+
+	log.Info().Msg("mark record as current")
+
+	tx, err := mr.conn.BeginTxx(ctx, &sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+
+	stmtTmpl, ok := mr.querier.GetQuery(UpdateCurrentFlagStmt)
+	if !ok {
+		return ErrorStmtNotFound
+	}
+
+	newRecord := map[string]any{
+		"current_flag": 1,
+		"end_date":     nil,
+		"id":           newFileID,
+		"prev_id":      prevFileID,
+	}
+
+	stmt := fmt.Sprintf(stmtTmpl, "AND prev_id IS :prev_id")
+	log.Debug().Str("update", "new").Any("rec", newRecord).Msg(stmt)
+
+	_, err = tx.NamedExecContext(
+		ctx,
+		stmt,
+		newRecord,
+	)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if prevFileID == nil {
+		return tx.Commit()
+	}
+
+	oldRecord := map[string]any{
+		"current_flag": 0,
+		"end_date":     database.Now(),
+		"id":           *prevFileID,
+	}
+
+	stmt = fmt.Sprintf(stmtTmpl, "")
+	log.Debug().Str("update", "old").Any("rec", newRecord).Msg(stmt)
+
+	_, err = tx.NamedExecContext(
+		ctx,
+		stmt,
+		oldRecord,
+	)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 const DefaultLimit = 20
 
-func (mr *MetadataRepository) ListByUserID(
+func (slf *MetadataRepository) ListByUserID(
 	ctx context.Context,
 	userID string,
 	offset int,
@@ -105,7 +170,7 @@ func (mr *MetadataRepository) ListByUserID(
 
 	hasMore := false
 
-	stmtTmpl, ok := mr.querier.GetQuery(GetFilesForUserStmt)
+	stmtTmpl, ok := slf.querier.GetQuery(GetFilesForUserStmt)
 	if !ok {
 		return nil, hasMore, errors.New("query_retriever_failed:2001:500")
 	}
@@ -113,7 +178,7 @@ func (mr *MetadataRepository) ListByUserID(
 	stmt := fmt.Sprintf(stmtTmpl, DefaultLimit+1, offset)
 	log.Debug().Msg(stmt)
 
-	rows, err := mr.conn.NamedQueryContext(
+	rows, err := slf.conn.NamedQueryContext(
 		ctx,
 		stmt,
 		map[string]any{
@@ -230,52 +295,52 @@ func (slf *MetadataTokenRepository) UpdateMetadataToken(
 
 	log.Info().Msg("update file metadata request and create stream token")
 
-	metaCreateStmt, ok := slf.metaQuerier.GetQuery(UpdateFileMetadataStmt)
-	if !ok {
-		log.Error().Msg("failed to create metadata update stmt")
-		return ErrorStmtNotFound
-	}
-
-	tokenStmt, ok := slf.tokenQuerier.GetQuery(tokens.CreateTokenStmt)
-	if !ok {
-		log.Error().Msg("failed to create tokens stmt")
-		return ErrorStmtNotFound
-	}
-
-	// Create the tokens and file metadatas in a transaction
-	tx, err := slf.conn.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.NamedExecContext(
-		ctx,
-		metaCreateStmt,
-		metadata,
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to update file metadata")
-		tx.Rollback()
-		return err
-	}
-
-	_, err = tx.NamedExecContext(
-		ctx,
-		tokenStmt,
-		token,
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to create tokens for stream")
-		tx.Rollback()
-
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		log.Error().Err(err).Msg("failed to create metadata or tokens")
-		return err
-	}
-
+	// metaCreateStmt, ok := slf.metaQuerier.GetQuery(UpdateFileMetadataStmt)
+	// if !ok {
+	// 	log.Error().Msg("failed to create metadata update stmt")
+	// 	return ErrorStmtNotFound
+	// }
+	//
+	// tokenStmt, ok := slf.tokenQuerier.GetQuery(tokens.CreateTokenStmt)
+	// if !ok {
+	// 	log.Error().Msg("failed to create tokens stmt")
+	// 	return ErrorStmtNotFound
+	// }
+	//
+	// // Create the tokens and file metadatas in a transaction
+	// tx, err := slf.conn.BeginTxx(ctx, nil)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// _, err = tx.NamedExecContext(
+	// 	ctx,
+	// 	metaCreateStmt,
+	// 	metadata,
+	// )
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("failed to update file metadata")
+	// 	tx.Rollback()
+	// 	return err
+	// }
+	//
+	// _, err = tx.NamedExecContext(
+	// 	ctx,
+	// 	tokenStmt,
+	// 	token,
+	// )
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("failed to create tokens for stream")
+	// 	tx.Rollback()
+	//
+	// 	return err
+	// }
+	//
+	// if err := tx.Commit(); err != nil {
+	// 	log.Error().Err(err).Msg("failed to create metadata or tokens")
+	// 	return err
+	// }
+	//
 	log.Info().Msg("metadata and tokens created successfully")
 
 	return nil

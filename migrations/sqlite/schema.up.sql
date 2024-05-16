@@ -1,15 +1,19 @@
 CREATE TABLE IF NOT EXISTS file_metadatas (
-	id VARCHAR(48) PRIMARY KEY
+	id VARCHAR(48)
+	,prev_id VARCHAR(48)
 	,user_id VARCHAR(48)
 	,file_name TEXT NOT NULL
 	,file_size INTEGER
 	,file_type VARCHAR(100)
 	,file_hash VARCHAR(255)
-	,chunks INTEGER
+	,chunks INTEGER NOT NULL
+	,current_flag TINYINT(1) DEFAULT 0
 	,upload_status VARCHAR(30) DEFAULT 'uploading'
 	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,end_date TIMESTAMP DEFAULT NULL
 );
+
 
 ---
 
@@ -32,7 +36,6 @@ CREATE TABLE IF NOT EXISTS user_files (
 	,next_chunk_id INTEGER
 	,chunk_blob_url TEXT NOT NULL
 	,chunk_hash TEXT NOT NULL
-	,version INTEGER DEFAULT 1
 	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -52,4 +55,3 @@ CREATE TABLE IF NOT EXISTS tokens (
 	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
----

@@ -70,7 +70,7 @@ type FileChunkRequest struct {
 	NextChunkID *int64        `json:"nextChunkID,omitempty"`
 
 	// We will come back to this later
-	Version int64 `json:"-"`
+	Version string `json:"-"`
 }
 
 func (slf *UserFileRepository) GetChunksForFile(ctx context.Context, fileID string) error {
@@ -174,7 +174,6 @@ func (slf *FileChunkService) Create(ctx context.Context, req *api.FileChunkReque
 		ChunkBlobUrl: storedPath,
 		ChunkHash:    req.ChunkDigest,
 		NextChunkID:  &nextChunkIDInt,
-		Version:      0,
 		Timestamp:    database.NewTimestamp(),
 	}
 
@@ -188,7 +187,6 @@ func (slf *FileChunkService) Create(ctx context.Context, req *api.FileChunkReque
 		NextChunkID:  nextChunkIDInt,
 		ChunkBlobUrl: storedPath,
 		ChunkHash:    req.ChunkDigest,
-		Version:      model.Version,
 		CreatedAt:    model.Timestamp.CreatedAt,
 		UpdatedAt:    model.Timestamp.UpdatedAt,
 	})
@@ -199,7 +197,6 @@ type ChunkUploadResponse struct {
 	NextChunkID  int64     `json:"nextChunkID"`
 	ChunkBlobUrl string    `json:"chunkBlobUrl"`
 	ChunkHash    string    `json:"chunkHash"`
-	Version      int       `json:"version"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }

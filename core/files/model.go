@@ -2,6 +2,7 @@ package files
 
 import (
 	"arbokcore/core/database"
+	"time"
 )
 
 const (
@@ -13,16 +14,24 @@ const (
 const FrontendChunkSize int64 = 4 * 1024 * 1024
 
 type FileMetadata struct {
-	ID       string `db:"id"`
-	UserID   string `db:"user_id"`
-	Filename string `db:"file_name"`
-	FileSize int64  `db:"file_size"`
-	FileType string `db:"file_type"`
-	FileHash string `db:"file_hash"`
-	NChunks  int    `db:"chunks"` // In MB
+	ID          string    `db:"id"`
+	UserID      string    `db:"user_id"`
+	Filename    string    `db:"file_name"`
+	FileSize    int64     `db:"file_size"`
+	FileType    string    `db:"file_type"`
+	FileHash    string    `db:"file_hash"`
+	NChunks     int       `db:"chunks"` // In MB
+	CurrentFlag bool      `db:"current_flag"`
+	UploadStaus string    `db:"upload_status"`
+	PrevID      *string   `db:"prev_id"`
+	EndDate     time.Time `db:"end_date"`
 
-	UploadStaus string `db:"upload_status"`
 	database.Timestamp
+}
+
+type CacheMetadata struct {
+	PrevID *string `json:"prevID" db:"prev_id"`
+	ID     string  `json:"id" db:"id"`
 }
 
 type UserFile struct {
@@ -32,19 +41,19 @@ type UserFile struct {
 	ChunkBlobUrl string `db:"chunk_blob_url"`
 	ChunkHash    string `db:"chunk_hash"`
 	NextChunkID  *int64 `db:"next_chunk_id"`
-	Version      int    `db:"version"`
 
 	database.Timestamp
 }
 
 type FilesWithChunks struct {
-	ID       string `db:"id" json:"fileID"`
-	UserID   string `db:"user_id" json:"-"`
-	Filename string `db:"file_name" json:"fileName"`
-	FileSize int64  `db:"file_size" json:"fileSize"`
-	FileType string `db:"file_type" json:"fileType"`
-	FileHash string `db:"file_hash" json:"fileHash"`
-	NChunks  int    `db:"chunks" json:"chunks"` // In MB
+	ID          string `db:"id" json:"fileID"`
+	UserID      string `db:"user_id" json:"-"`
+	Filename    string `db:"file_name" json:"fileName"`
+	FileSize    int64  `db:"file_size" json:"fileSize"`
+	FileType    string `db:"file_type" json:"fileType"`
+	FileHash    string `db:"file_hash" json:"fileHash"`
+	NChunks     int    `db:"chunks" json:"chunks"` // In MB
+	CurrentFlag bool   `db:"current_flag" json:"currentFlag"`
 
 	UploadStaus  string `db:"upload_status" json:"uploadStatus"`
 	FileID       string `db:"file_id" json:"-"`
@@ -52,7 +61,7 @@ type FilesWithChunks struct {
 	ChunkBlobUrl string `db:"chunk_blob_url" json:"chunkBlobUrl"`
 	ChunkHash    string `db:"chunk_hash" json:"chunkHash"`
 	NextChunkID  *int64 `db:"next_chunk_id" json:"nextChunkID"`
-	Version      int    `db:"version" json:"version"`
+	// Version      string `db:"version" json:"version"`
 
 	database.Timestamp
 }

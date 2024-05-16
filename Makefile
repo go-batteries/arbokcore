@@ -1,5 +1,5 @@
-run.server:
-	go run cmd/server/main.go migrate -dir up
+run.setup:
+	go run cmd/cli/main.go migrate -dir up
 
 build.testdata:
 	mkdir -p tmp/testdata

@@ -6,6 +6,7 @@ import (
 	"arbokcore/core/tokens"
 	"arbokcore/pkg/blobstore"
 	"arbokcore/pkg/config"
+	"arbokcore/pkg/queuer"
 	"arbokcore/pkg/squirtle"
 	"arbokcore/web/middlewares"
 	"arbokcore/web/routes"
@@ -78,8 +79,20 @@ func main() {
 		metadataQueryStore,
 		tokensQs,
 	)
+
+	redisConn, err := database.NewRedisConnection(cfg.RedisURL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connected to redis")
+	}
+
+	metadataQ := queuer.NewRedisQ(
+		redisConn,
+		database.MetadataRedisQueue,
+		20*time.Second,
+	)
+
 	filesrepo := files.NewMetadataRepository(dbconn, metadataQueryStore)
-	filesvc := files.NewMetadataService(filesrepo, metadataTokenRepo)
+	filesvc := files.NewMetadataService(filesrepo, metadataTokenRepo, metadataQ)
 
 	chunkQs, err := qs.HydrateQueryStore("user_files")
 	if err != nil {
@@ -102,20 +115,32 @@ func main() {
 
 	router.GET("/ping", hello)
 
+	// TODO: do a compare and set operation
 	e.PATCH("/my/files/:fileID",
 		metadataHandler.UpdateFileMetadata,
 		authsvc.ValidateAccessToken,
 	)
 
+	//TODO: create a metadata object
+	// and return the expected version number
 	e.POST("/my/files",
 		metadataHandler.PostFileMetadata,
 		authsvc.ValidateAccessToken)
 
+	//TODO: return the versioned files with versioned chunk
+	// Get the last 3 versions from metadata
+	// Get all the chunks for those versions
 	e.GET("/my/files",
 		metadataHandler.GetFileMetadata,
 		authsvc.ValidateAccessToken,
 	)
 
+	//TODO: see if a check is needed for version number check
+	// since without a stream token, version number and fileID
+	// this api is useless.
+	// But incase these details get compromised, or someone tries to send
+	// with the wrong version number, then it has to be stopped.
+	// But, use the version number while creating, anyway
 	e.PATCH("/my/files/:fileID/chunks",
 		chunkHandler.UpsertChunks,
 		authsvc.ValidateStreamToken,
