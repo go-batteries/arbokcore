@@ -14,17 +14,17 @@ const (
 const FrontendChunkSize int64 = 4 * 1024 * 1024
 
 type FileMetadata struct {
-	ID          string    `db:"id"`
-	UserID      string    `db:"user_id"`
-	Filename    string    `db:"file_name"`
-	FileSize    int64     `db:"file_size"`
-	FileType    string    `db:"file_type"`
-	FileHash    string    `db:"file_hash"`
-	NChunks     int       `db:"chunks"` // In MB
-	CurrentFlag bool      `db:"current_flag"`
-	UploadStaus string    `db:"upload_status"`
-	PrevID      *string   `db:"prev_id"`
-	EndDate     time.Time `db:"end_date"`
+	ID          string     `db:"id"`
+	UserID      string     `db:"user_id"`
+	Filename    string     `db:"file_name"`
+	FileSize    int64      `db:"file_size"`
+	FileType    string     `db:"file_type"`
+	FileHash    string     `db:"file_hash"`
+	NChunks     int        `db:"chunks"` // In MB
+	CurrentFlag bool       `db:"current_flag"`
+	UploadStaus string     `db:"upload_status"`
+	PrevID      *string    `db:"prev_id"`
+	EndDate     *time.Time `db:"end_date"`
 
 	database.Timestamp
 }
@@ -62,6 +62,8 @@ type FilesWithChunks struct {
 	ChunkHash    string `db:"chunk_hash" json:"chunkHash"`
 	NextChunkID  *int64 `db:"next_chunk_id" json:"nextChunkID"`
 	// Version      string `db:"version" json:"version"`
+	PrevID  *string    `db:"prev_id" json:"prevID"`
+	EndDate *time.Time `db:"end_date"`
 
 	database.Timestamp
 }

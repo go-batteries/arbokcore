@@ -3,7 +3,6 @@ package queuer
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -101,8 +100,6 @@ func (slf *RedisQ) ReadMsg(ctx context.Context, key string) (data *Payload, err 
 		log.Error().Err(err).Msg("failed to fetch results from q")
 		return nil, err
 	}
-
-	fmt.Println(results)
 
 	if len(results) < 2 {
 		return nil, ErrEmptyRecords

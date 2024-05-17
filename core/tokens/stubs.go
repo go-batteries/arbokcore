@@ -6,25 +6,25 @@ import (
 )
 
 var AdminToken = Token{
-	ResouceID:    "U11223455",
+	ResourceID:   "U11223455",
 	ResouceType:  "user",
 	AccessToken:  "trial_access_token",
 	RefreshToken: "trial_refresh_token",
 	TokenType:    "user",
 
-	AccessExpiresAt:  time.Now().Add(1 * time.Hour),
-	RefreshExpiresAt: time.Now().Add(5 * time.Hour),
+	AccessExpiresAt:  database.Now().Add(1 * time.Hour),
+	RefreshExpiresAt: database.Now().Add(5 * time.Hour),
 
 	Timestamp: database.NewTimestamp(),
 }
 
 var StreamToken = Token{
-	ResouceID:    "S11223455",
+	ResourceID:   "S11223455",
 	ResouceType:  "stream",
 	AccessToken:  "trial_stream_access_token",
 	RefreshToken: "trial_stream_refresh_token",
 	TokenType:    "stream",
-	UserID:       &AdminToken.ResouceID,
+	UserID:       &AdminToken.ResourceID,
 
 	AccessExpiresAt:  time.Now().Add(1 * time.Hour),
 	RefreshExpiresAt: time.Now().Add(5 * time.Hour),
@@ -33,7 +33,7 @@ var StreamToken = Token{
 }
 
 var InvalidStreamToken = Token{
-	ResouceID:    "S11223455",
+	ResourceID:   "S11223455",
 	ResouceType:  "stream",
 	AccessToken:  "trial_stream_access_token_invalid",
 	RefreshToken: "trial_stream_refresh_token_invalid",

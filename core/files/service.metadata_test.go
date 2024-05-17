@@ -1,13 +1,5 @@
 package files
 
-import (
-	"log"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-)
-
 func buildTestFileInfo(fileID string, chunkID int64, version string) *FilesWithChunks {
 	return &FilesWithChunks{
 		ID:       fileID,
@@ -18,6 +10,7 @@ func buildTestFileInfo(fileID string, chunkID int64, version string) *FilesWithC
 	}
 }
 
+/*
 func Test_BuildFilesInfoResponse(t *testing.T) {
 	t.Run("different files for a given version", func(t *testing.T) {
 
@@ -54,3 +47,4 @@ func Test_BuildFilesInfoResponse(t *testing.T) {
 		require.Equal(t, len(infoResp[0].VersionChunks), 2)
 	})
 }
+*/

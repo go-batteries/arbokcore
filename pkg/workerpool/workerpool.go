@@ -1,7 +1,6 @@
 package workerpool
 
 import (
-	"arbokcore/pkg/utils"
 	"context"
 	"log"
 )
@@ -120,8 +119,9 @@ func (w *Worker[E, V]) Start(ctx context.Context) chan V {
 				log.Printf("worker:%d", w.ID)
 				// utils.Dump(job)
 				result := w.Processor(ctx, job)
-				utils.Dump(result)
-				resultCh <- result
+				_ = result
+				// utils.Dump(result)
+				// resultCh <- result
 			case <-w.Quit:
 				log.Println("quiting")
 				return

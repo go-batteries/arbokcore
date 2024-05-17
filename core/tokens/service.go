@@ -142,8 +142,7 @@ func (tsrepo *TokensRepository) FindByStreamToken(
 
 	token := &Token{}
 
-	log.Info().Msgf("token clause %+v\n", clause)
-
+	// log.Info().Msgf("token clause %+v", clause)
 	rows, err := tsrepo.conn.NamedQueryContext(
 		ctx,
 		stmt,

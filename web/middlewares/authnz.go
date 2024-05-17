@@ -112,7 +112,7 @@ func (slf *AuthMidllewareService) ValidateStreamToken(next echo.HandlerFunc) ech
 			AccessToken:  accessToken,
 			TestMode:     true,
 			StreamToken:  streamToken,
-			UserID:       &tokens.AdminToken.ResouceID, // TODO: get userID from access token
+			UserID:       &tokens.AdminToken.ResourceID, // TODO: get userID from access token
 		})
 		if err != nil {
 			log.Error().Err(err).Msg("failed to validate stream token")

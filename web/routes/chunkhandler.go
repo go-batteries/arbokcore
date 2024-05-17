@@ -55,7 +55,7 @@ func (handler *ChunkHandler) UpsertChunks(c echo.Context) error {
 	// fmt.Printf("chunk %+v, size %d\n", req, fh.Size)
 
 	req.Data = file
-	req.FileID = token.ResouceID
+	req.FileID = token.ResourceID
 	req.UserID = *token.UserID
 
 	resp := handler.ChunkSvc.Create(ctx, req)

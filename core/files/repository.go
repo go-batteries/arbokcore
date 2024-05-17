@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
@@ -23,6 +24,7 @@ const (
 	GetFilesForUserStmt    = "GetFilesForUser"
 	UpdateCurrentFlagStmt  = "UpdateCurrentFlag"
 	FindByHashStmt         = "FindByHash"
+	SelectFilesForUserStmt = "SelectFilesForUser"
 
 	InsertFileChunk = "InsertFileChunk"
 	GetChunksByFile = "GetChunksByFile"
@@ -33,6 +35,10 @@ func NewMetadataRepository(conn *sqlx.DB, querier squirtle.QueryMapper) *Metadat
 		conn:    conn,
 		querier: querier,
 	}
+}
+
+type FileIDsRequest struct {
+	FileIDs []string `json:"fileIDs"`
 }
 
 type MetadataRequest struct {
@@ -65,6 +71,100 @@ func (slf *MetadataRepository) Create(
 	return metadata, nil
 }
 
+type FindKV struct {
+	Key         string
+	PlaceHolder string
+	Operator    string
+	Val         any
+}
+
+type OrderKV struct {
+	Field string
+	Order string
+}
+
+type FindClause []FindKV
+type OrderClause []OrderKV
+
+type LimitClause struct {
+	Limit  int
+	Offset int
+}
+
+//TODO: Do this instead for FindBy
+
+type QueryBuilder struct {
+	*FindClause
+	*OrderClause
+	*LimitClause
+}
+
+func (clauses FindClause) String() string {
+	c := []string{}
+
+	for _, clause := range clauses {
+		placeholder := clause.PlaceHolder
+		if placeholder == "" {
+			placeholder = fmt.Sprintf(":%s", clause.Key)
+		}
+
+		c = append(c, fmt.Sprintf("%s %s %s", clause.Key, clause.Operator, placeholder))
+	}
+
+	return strings.Join(c, " AND ")
+}
+
+func (clauses FindClause) Args() map[string]any {
+	args := map[string]any{}
+
+	for _, kv := range clauses {
+		args[kv.Key] = kv.Val
+	}
+
+	return args
+}
+
+func (slf *MetadataRepository) FindBy(ctx context.Context, clauses FindClause) ([]*FileMetadata, error) {
+	if len(clauses) == 0 {
+		return nil, errors.New("clause is not present")
+	}
+
+	clauseStr := clauses.String()
+	log.Info().Str("clause", clauseStr).Msg("clause str")
+
+	stmtTmpl, ok := slf.querier.GetQuery("FindBy")
+	if !ok {
+		log.Error().Msg("failed to find by " + clauseStr)
+		return nil, ErrorStmtNotFound
+	}
+
+	metadatas := []*FileMetadata{}
+
+	stmt := fmt.Sprintf(stmtTmpl, clauseStr)
+
+	fmt.Println("find by ", stmt)
+
+	nstmt, err := slf.conn.PrepareNamedContext(ctx, stmt)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to prepare named stmt")
+		return nil, errors.New("failed to construct prepared stmt")
+	}
+
+	err = nstmt.SelectContext(
+		ctx,
+		&metadatas,
+		clauses.Args(),
+	)
+
+	if err != nil {
+		log.Error().Err(err).Msg("failed to find metadata")
+		return nil, err
+	}
+
+	log.Info().Int("count", len(metadatas)).Msg("fetched metadatas")
+	return metadatas, nil
+}
+
 var (
 	ErrDuplicateFile = errors.New("duplicate_file")
 )
@@ -93,14 +193,48 @@ func (slf *MetadataRepository) FindByHash(
 		log.Error().Err(err).Msg("failed to find by hash")
 		return false, nil
 	}
+	if found > 0 {
+		err = ErrDuplicateFile
+	}
 
-	return true, ErrDuplicateFile
+	return found > 0, err
+}
+
+func (mr *MetadataRepository) SelectFiles(ctx context.Context, ids []*string) ([]*FilesWithChunks, error) {
+
+	stmt, ok := mr.querier.GetQuery(SelectFilesForUserStmt)
+	if !ok {
+		return nil, ErrorStmtNotFound
+	}
+
+	query, args, err := sqlx.In(stmt, ids)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to build in query")
+		return nil, err
+	}
+
+	query = mr.conn.Rebind(query)
+	fmt.Println(query, args)
+
+	filesWithChunks := []*FilesWithChunks{}
+
+	err = mr.conn.SelectContext(
+		ctx,
+		&filesWithChunks,
+		query,
+		args...,
+	)
+
+	log.Info().Int("count", len(filesWithChunks)).Msg("fetched files with chunks")
+
+	return filesWithChunks, err
 }
 
 func (mr *MetadataRepository) Update(
 	ctx context.Context,
 	prevFileID *string,
 	newFileID string,
+	uploadStatus string,
 ) (err error) {
 
 	log.Info().Msg("mark record as current")
@@ -115,10 +249,11 @@ func (mr *MetadataRepository) Update(
 	}
 
 	newRecord := map[string]any{
-		"current_flag": 1,
-		"end_date":     nil,
-		"id":           newFileID,
-		"prev_id":      prevFileID,
+		"current_flag":  1,
+		"end_date":      nil,
+		"id":            newFileID,
+		"prev_id":       prevFileID,
+		"upload_status": uploadStatus,
 	}
 
 	stmt := fmt.Sprintf(stmtTmpl, "AND prev_id IS :prev_id")
@@ -139,9 +274,10 @@ func (mr *MetadataRepository) Update(
 	}
 
 	oldRecord := map[string]any{
-		"current_flag": 0,
-		"end_date":     database.Now(),
-		"id":           *prevFileID,
+		"current_flag":  0,
+		"end_date":      database.Now(),
+		"id":            *prevFileID,
+		"upload_status": uploadStatus,
 	}
 
 	stmt = fmt.Sprintf(stmtTmpl, "")

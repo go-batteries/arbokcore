@@ -99,12 +99,13 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to load user files query")
 	}
 
+	chunkRepo := files.NewUserFileRespository(dbconn, chunkQs)
+
 	localFs, err := blobstore.NewLocalFS("./tmp/arbokdata")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed initialized file system")
 	}
 
-	chunkRepo := files.NewUserFileRespository(dbconn, chunkQs)
 	chunkSvc := files.NewFileChunkService(chunkRepo, localFs)
 
 	metadataHandler := &routes.MetadataHandler{FileSvc: filesvc}
@@ -133,6 +134,12 @@ func main() {
 	e.GET("/my/files",
 		metadataHandler.GetFileMetadata,
 		authsvc.ValidateAccessToken,
+	)
+
+	//TODO: write an api for multiple fileIDs
+	e.PUT("/my/files/:fileID/eof",
+		metadataHandler.MarkUploadComplete,
+		authsvc.ValidateStreamToken,
 	)
 
 	//TODO: see if a check is needed for version number check

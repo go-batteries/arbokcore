@@ -6,11 +6,12 @@ import (
 )
 
 func Dump(stuff any) {
-	b, err := json.Marshal(stuff)
+	b, err := json.MarshalIndent(stuff, "", " ")
 	if err != nil {
 		log.Printf("%T %v", stuff, stuff)
 		return
 	}
 
-	log.Println("dump:", string(b), stuff)
+	log.Println("dump:", string(b))
+	log.Println(stuff)
 }

@@ -4,6 +4,7 @@ import (
 	"arbokcore/core/api"
 	"arbokcore/core/files"
 	"arbokcore/core/tokens"
+	"arbokcore/pkg/utils"
 	"arbokcore/web/middlewares"
 	"net/http"
 	"strconv"
@@ -17,10 +18,40 @@ type MetadataHandler struct {
 }
 
 const (
-	RouteMetadataGet   = "/my/files"
-	RouteMetadataPost  = "/my/files"
-	RouteMetadataPatch = "/my/files/:fileID"
+	RouteMetadataGet    = "/my/files"
+	RouteMetadataPost   = "/my/files"
+	RouteMetadataPatch  = "/my/files/:fileID"
+	RouteFileUploadDone = "/my/files/:fileID/eof"
 )
+
+func (handler *MetadataHandler) MarkUploadComplete(c echo.Context) error {
+	token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
+	if !ok {
+		log.Error().Msg("token validation not done")
+		return c.NoContent(http.StatusUnauthorized)
+	}
+
+	utils.Dump(token)
+
+	ctx := c.Request().Context()
+
+	if token.ResourceID != c.Param("fileID") {
+		log.Error().
+			Str("resource_id", token.ResourceID).
+			Str("fileID", c.Param("fileID")).
+			Msg("fileID for the stream token invalid")
+
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	resp := handler.FileSvc.MarkUploadComplete(ctx, token.ResourceID)
+	if !resp.Success {
+		return c.JSON(resp.Error.HttpStatus, resp)
+	}
+
+	return c.JSON(http.StatusOK, resp)
+
+}
 
 func (handler *MetadataHandler) PostFileMetadata(c echo.Context) error {
 	req := &files.MetadataRequest{}
@@ -40,7 +71,7 @@ func (handler *MetadataHandler) PostFileMetadata(c echo.Context) error {
 	}
 
 	resp := handler.FileSvc.PrepareFileForUpload(ctx, files.MetadataRequest{
-		UserID:       token.ResouceID,
+		UserID:       token.ResourceID,
 		FileName:     req.FileName,
 		FileType:     req.FileType,
 		FileSize:     req.FileSize,
@@ -90,7 +121,7 @@ func (handler *MetadataHandler) GetFileMetadata(c echo.Context) error {
 		offset = 0
 	}
 
-	resp := handler.FileSvc.ListFilesForUser(ctx, token.ResouceID, offset)
+	resp := handler.FileSvc.ListFilesForUser(ctx, token.ResourceID, offset)
 
 	if resp.Success {
 		return c.JSON(http.StatusOK, resp)
@@ -116,7 +147,8 @@ func (handler *MetadataHandler) UpdateFileMetadata(c echo.Context) error {
 		log.Error().Msg("current token is not set")
 		return c.NoContent(http.StatusForbidden)
 	}
-	req.UserID = token.ResouceID
+
+	req.UserID = token.ResourceID
 
 	resp := handler.FileSvc.UpdateFileMetadata(ctx, req)
 	if resp.Success {

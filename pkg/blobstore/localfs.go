@@ -18,6 +18,7 @@ type ChunkedFile struct {
 	data    io.Reader
 	chunkID int64
 
+	fileDir   string
 	chunkPath string
 	next      *ChunkedFile
 }

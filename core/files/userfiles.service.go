@@ -62,6 +62,32 @@ func (slf *UserFileRepository) Create(ctx context.Context, userFile *UserFile) e
 	return err
 }
 
+func (slf *UserFileRepository) CreateBatch(ctx context.Context, chunks []*UserFile) error {
+	stmt, ok := slf.querier.GetQuery(CreateFileChunkStmt)
+	if !ok {
+		return ErrorStmtNotFound
+	}
+
+	//TODO: validate userFile
+
+	tx, err := slf.conn.BeginTxx(ctx, nil)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to init transaction")
+		return err
+	}
+
+	for _, chunk := range chunks {
+		_, err = tx.NamedExecContext(ctx, stmt, chunk)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to prepare transaction")
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 type FileChunkRequest struct {
 	UserID      string        `json:"-"`
 	FileID      string        `json:"-"`

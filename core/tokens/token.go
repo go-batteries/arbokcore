@@ -10,7 +10,7 @@ import (
 )
 
 type Token struct {
-	ResouceID    string  `db:"resource_id"`
+	ResourceID   string  `db:"resource_id"`
 	ResouceType  string  `db:"resource_type"`
 	AccessToken  string  `db:"access_token"`
 	RefreshToken string  `db:"refresh_token"`
@@ -65,7 +65,7 @@ type TokenOpts func(*Token)
 
 func WithResource(resourceID, resourceType string) TokenOpts {
 	return func(t *Token) {
-		t.ResouceID = resourceID
+		t.ResourceID = resourceID
 		t.ResouceType = resourceType
 	}
 }
@@ -105,7 +105,7 @@ func NewToken(resourceID, resourceType string, opts ...TokenOpts) (*Token, error
 	}
 
 	token := &Token{
-		ResouceID:        resourceID,
+		ResourceID:       resourceID,
 		ResouceType:      resourceType,
 		AccessToken:      accessToken,
 		RefreshToken:     refreshToken,

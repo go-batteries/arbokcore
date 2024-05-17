@@ -54,6 +54,7 @@ LIMIT %d OFFSET %d;
 
 SELECT 
 	fm.id
+	,fm.prev_id
 	,fm.user_id
 	,fm.file_name
 	,fm.file_size
@@ -83,6 +84,7 @@ UPDATE file_metadatas
 SET
 	current_flag = :current_flag
 	,end_date = :end_date
+	,upload_status = :upload_status
 WHERE
 	id = :id
 %s;
@@ -93,3 +95,50 @@ WHERE
 SELECT COUNT(1) as found 
 FROM file_metadatas 
 WHERE file_hash = ?;
+
+
+--sql:FindBy
+SELECT 
+	id
+	,prev_id
+	,user_id
+	,file_name
+	,file_size
+	,file_type
+	,file_hash
+	,chunks
+	,current_flag
+	,upload_status
+	,created_at
+	,updated_at
+	,end_date
+FROM file_metadatas
+WHERE %s;
+
+
+--sql:SelectFilesForUser
+
+SELECT 
+	fm.id
+	,fm.prev_id
+	,fm.user_id
+	,fm.file_name
+	,fm.file_size
+	,fm.file_type
+	,fm.file_hash
+	,fm.chunks
+	,fm.current_flag
+	,fm.created_at
+	,fm.end_date
+	,ufs.chunk_id
+	,ufs.next_chunk_id
+	,ufs.chunk_blob_url
+	,ufs.chunk_hash
+	,ufs.created_at
+	,ufs.updated_at
+FROM file_metadatas fm
+JOIN user_files ufs
+ON
+	ufs.file_id = fm.id
+WHERE fm.id IN (?)
+ORDER BY fm.created_at DESC
