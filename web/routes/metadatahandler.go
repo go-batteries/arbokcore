@@ -98,13 +98,14 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 		log.Error().Err(err).Msg("failed to create output file")
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	defer outputFile.Close()
 
 	_, err = io.Copy(outputFile, buffer)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write to output file")
+		outputFile.Close()
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	outputFile.Close()
 
 	return c.Attachment(outputFilePath, infoResp.Name)
 }

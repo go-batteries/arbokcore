@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"arbokcore/core/tokens"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -70,6 +71,31 @@ func (slf *AuthMidllewareService) ValidateAccessToken(next echo.HandlerFunc) ech
 
 		return next(c)
 
+	}
+}
+
+// TODO: this is to be used only for download tokens
+const (
+	DownloadTokenHeaderAuthKey = StreamTokenHeaderKey
+	DownloadTokenHeader        = "Bearer %s"
+)
+
+func (slf *AuthMidllewareService) AddTokenFromUrlToHeader(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		downloadSignatureToken := c.QueryParam("X-Sig-Token")
+
+		fmt.Println(downloadSignatureToken)
+		splits := strings.Split(downloadSignatureToken, ":")
+
+		toBearerToken := fmt.Sprintf(DownloadTokenHeader, splits[0])
+		toBearerAccessToken := fmt.Sprintf(DownloadTokenHeader, splits[1])
+
+		if downloadSignatureToken != "" {
+			c.Request().Header.Add(AccessTokenHeaderKey, toBearerAccessToken)
+			c.Request().Header.Add(DownloadTokenHeaderAuthKey, toBearerToken)
+		}
+
+		return next(c)
 	}
 }
 
