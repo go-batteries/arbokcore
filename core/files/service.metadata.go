@@ -5,6 +5,7 @@ import (
 	"arbokcore/core/database"
 	"arbokcore/core/tokens"
 	"arbokcore/pkg/queuer"
+	"arbokcore/pkg/rho"
 	"arbokcore/pkg/utils"
 	"bytes"
 	"context"
@@ -35,7 +36,50 @@ func NewMetadataService(
 	}
 }
 
-func (ms *MetadataService) MarkUploadComplete(ctx context.Context, fileID string) api.Response {
+func (ms MetadataService) ListOrderedFileChunks(ctx context.Context, fileID string, userID string) ([]string, *FileInfoResponse, error) {
+
+	filesWithChunks, err := ms.repo.SelectFiles(ctx, []*string{&fileID})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get files with chunks")
+		return nil, nil, errors.New("internal_error:2025:500")
+	}
+
+	filesWithChunks = rho.Filter(filesWithChunks, func(chunk *FilesWithChunks, _ int) bool {
+		return chunk.UserID == userID
+	})
+
+	metadataResponses := BuildFilesInfoResponse(filesWithChunks)
+	if len(metadataResponses) < 1 {
+		return nil, nil, errors.New("file_corrupted:2045:500")
+	}
+
+	var fileInfoResp *FileInfoResponse
+	for _, resp := range metadataResponses {
+		if resp.ID == fileID {
+			fileInfoResp = resp
+		}
+	}
+
+	if fileInfoResp == nil {
+		return nil, nil, errors.New("file_not_found:2046:500")
+	}
+
+	chunks := make([]string, fileInfoResp.NChunks)
+
+	for _, chunk := range fileInfoResp.Chunks {
+		chunks[chunk.ChunkID] = chunk.ChunkBlobUrl
+	}
+
+	log.Info().Int("chunks len", len(chunks)).Msg("number of chunks")
+
+	return chunks, fileInfoResp, nil
+}
+
+func (ms *MetadataService) MarkUploadComplete(
+	ctx context.Context,
+	fileID string,
+) api.Response {
+
 	log.Info().Msg("marking file upload as complete")
 
 	results, err := ms.repo.FindBy(ctx, FindClause{

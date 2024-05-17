@@ -153,6 +153,11 @@ func main() {
 		authsvc.ValidateStreamToken,
 	)
 
+	e.GET("/my/files/:fileID/download",
+		metadataHandler.DownloadFile,
+		authsvc.ValidateStreamToken,
+	)
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
 		Handler: e,

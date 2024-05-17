@@ -4,9 +4,12 @@ import (
 	"arbokcore/core/api"
 	"arbokcore/core/files"
 	"arbokcore/core/tokens"
-	"arbokcore/pkg/utils"
 	"arbokcore/web/middlewares"
+	"bytes"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
@@ -31,8 +34,6 @@ func (handler *MetadataHandler) MarkUploadComplete(c echo.Context) error {
 		return c.NoContent(http.StatusUnauthorized)
 	}
 
-	utils.Dump(token)
-
 	ctx := c.Request().Context()
 
 	if token.ResourceID != c.Param("fileID") {
@@ -51,6 +52,59 @@ func (handler *MetadataHandler) MarkUploadComplete(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, resp)
 
+}
+
+func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
+	token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
+	if !ok {
+		log.Error().Msg("token validation not done")
+		return c.NoContent(http.StatusUnauthorized)
+	}
+
+	ctx := c.Request().Context()
+
+	fileID := c.Param("fileID")
+	downloadUrls, infoResp, err := handler.FileSvc.ListOrderedFileChunks(ctx, fileID, *token.UserID)
+
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get files chunks")
+		resp := api.BuildResponse(err, nil)
+		return c.JSON(resp.Error.HttpStatus, resp)
+	}
+
+	var buffer = bytes.NewBuffer(make([]byte, infoResp.Size))
+
+	for _, filePath := range downloadUrls {
+		file, err := os.Open(filePath)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to find file in url")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		defer file.Close()
+
+		_, err = io.Copy(buffer, file)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to copy file chunk into buffer")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+	}
+
+	outputFilePath := fmt.Sprintf("./tmp/outdir/%s", infoResp.Name)
+	outputFile, err := os.Create(outputFilePath)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create output file")
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	defer outputFile.Close()
+
+	_, err = io.Copy(outputFile, buffer)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to write to output file")
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.Stream(http.StatusPartialContent, infoResp.Type, buffer)
 }
 
 func (handler *MetadataHandler) PostFileMetadata(c echo.Context) error {

@@ -214,7 +214,7 @@ func (mr *MetadataRepository) SelectFiles(ctx context.Context, ids []*string) ([
 	}
 
 	query = mr.conn.Rebind(query)
-	fmt.Println(query, args)
+	// fmt.Println(query, args)
 
 	filesWithChunks := []*FilesWithChunks{}
 
