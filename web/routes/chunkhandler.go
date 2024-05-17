@@ -5,6 +5,7 @@ import (
 	"arbokcore/core/files"
 	"arbokcore/core/tokens"
 	"arbokcore/web/middlewares"
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -51,8 +52,9 @@ func (handler *ChunkHandler) UpsertChunks(c echo.Context) error {
 		log.Error().Err(err).Msg("failed to open file chunk")
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	defer file.Close()
 
-	// fmt.Printf("chunk %+v, size %d\n", req, fh.Size)
+	fmt.Printf("chunk %+v, size %d\n", req, fh.Size)
 
 	req.Data = file
 	req.FileID = token.ResourceID

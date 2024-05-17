@@ -43,14 +43,14 @@ type MetadataRequest struct {
 }
 
 type FileChunkRequest struct {
-	ChunkID     string    `form:"id"`
-	NextChunkID string    `form:"nextChunkID"`
-	ChunkDigest string    `form:"chunkDigest"`
-	ChunkSize   int       `form:"chunkSize"`
-	FileDigest  string    `form:"fileDigest"` // Validate this against versio in file_metadatas.file_id = req.FileID
-	Data        io.Reader `form:"-"`
-	FileID      string    `form:"-"`
-	UserID      string    `form:"-"`
+	ChunkID     string            `form:"id"`
+	NextChunkID string            `form:"nextChunkID"`
+	ChunkDigest string            `form:"chunkDigest"`
+	ChunkSize   int               `form:"chunkSize"`
+	FileDigest  string            `form:"fileDigest"` // Validate this against versio in file_metadatas.file_id = req.FileID
+	Data        io.ReadSeekCloser `form:"-"`
+	FileID      string            `form:"-"`
+	UserID      string            `form:"-"`
 }
 
 type FileUpdateMetadataRequest struct {

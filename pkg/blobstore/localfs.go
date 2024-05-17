@@ -2,20 +2,22 @@ package blobstore
 
 import (
 	"arbokcore/pkg/utils"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 //TODO: use https://pkg.go.dev/github.com/rogpeppe/go-internal/lockedfile to lock the directory
 
 type ChunkedFile struct {
-	data    io.Reader
+	data    io.ReadSeekCloser
 	chunkID int64
 
 	fileDir   string
@@ -25,7 +27,7 @@ type ChunkedFile struct {
 
 const ChunkSize = int64(4 * 1024 * 1024)
 
-func NewChunkedFile(data io.Reader, chunkID int64, next *ChunkedFile) *ChunkedFile {
+func NewChunkedFile(data io.ReadSeekCloser, chunkID int64, next *ChunkedFile) *ChunkedFile {
 	return &ChunkedFile{data: data, chunkID: chunkID, next: next}
 }
 
@@ -73,7 +75,6 @@ func EnsureDir(resolvedPath string) error {
 		}
 
 		if info.IsDir() {
-			log.Println("exists")
 			return nil
 		}
 
@@ -94,18 +95,31 @@ func (slf *LocalFS) UpdateChunk(ctx context.Context, fileID string, chunk *Chunk
 	tracker := utils.Bench2("file create")
 	file, err := os.Create(path)
 	if err != nil {
+		log.Error().Err(err).Msg("failed to create file at " + path)
 		return "", err
 	}
 	tracker()
 
+	chunk.data.Seek(0, io.SeekStart)
+
+	var byt bytes.Buffer
+	byt.ReadFrom(chunk.data)
+
+	fmt.Println("dhir bal", len(byt.String()))
+	chunk.data.Seek(0, io.SeekStart)
+
 	tracker = utils.Bench2("copy file")
 	written, err := io.Copy(file, chunk.data)
 	if err != nil {
+		log.Error().Err(err).Msg("failed to write to dile")
 		return "", nil
 	}
 	tracker()
 
-	log.Printf("written %d bytes\n", written)
+	log.Info().
+		Int("written data", int(written)).
+		Str("path", path).
+		Msg("written to path")
 
 	return path, nil
 }
@@ -133,7 +147,7 @@ func (slf *LocalFS) BatchCreateChunk(
 
 			filePath, err := slf.UpdateChunk(ctx, fileID, &_chunk)
 			if err != nil {
-				log.Println(err)
+				log.Error().Err(err).Msg("failed to update chunk")
 				return
 			}
 

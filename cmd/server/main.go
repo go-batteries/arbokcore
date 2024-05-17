@@ -36,18 +36,6 @@ func main() {
 	flag.StringVar(&port, "port", "9191", "pass the port number")
 	flag.Parse()
 
-	// Echo instance
-	e := echo.New()
-
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:  []string{"http://localhost"},
-		AllowHeaders:  []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, ACCESS_TOKEN_HEADER, STREAM_TOKEN_HEADER},
-		ExposeHeaders: []string{echo.HeaderContentLength, echo.HeaderContentDisposition, echo.HeaderContentEncoding},
-	}))
-
 	cfg := config.Load("./config/")
 	_ = cfg
 
@@ -111,43 +99,53 @@ func main() {
 	metadataHandler := &routes.MetadataHandler{FileSvc: filesvc}
 	chunkHandler := &routes.ChunkHandler{ChunkSvc: chunkSvc}
 
+	// Echo instance
+	e := echo.New()
+
+	// Middleware
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowHeaders: []string{
+			echo.HeaderOrigin,
+			echo.HeaderContentType,
+			echo.HeaderAccept,
+			echo.HeaderContentDisposition,
+			ACCESS_TOKEN_HEADER,
+			STREAM_TOKEN_HEADER,
+		},
+		ExposeHeaders: []string{
+			echo.HeaderContentLength,
+			echo.HeaderContentDisposition,
+			echo.HeaderContentEncoding,
+		},
+	}))
+
 	// Routes
 	router := e.Group("arbokcore")
 
 	router.GET("/ping", hello)
 
-	// TODO: do a compare and set operation
 	e.PATCH("/my/files/:fileID",
 		metadataHandler.UpdateFileMetadata,
 		authsvc.ValidateAccessToken,
 	)
 
-	//TODO: create a metadata object
-	// and return the expected version number
 	e.POST("/my/files",
 		metadataHandler.PostFileMetadata,
 		authsvc.ValidateAccessToken)
 
-	//TODO: return the versioned files with versioned chunk
-	// Get the last 3 versions from metadata
-	// Get all the chunks for those versions
 	e.GET("/my/files",
 		metadataHandler.GetFileMetadata,
 		authsvc.ValidateAccessToken,
 	)
 
-	//TODO: write an api for multiple fileIDs
 	e.PUT("/my/files/:fileID/eof",
 		metadataHandler.MarkUploadComplete,
 		authsvc.ValidateStreamToken,
 	)
 
-	//TODO: see if a check is needed for version number check
-	// since without a stream token, version number and fileID
-	// this api is useless.
-	// But incase these details get compromised, or someone tries to send
-	// with the wrong version number, then it has to be stopped.
-	// But, use the version number while creating, anyway
 	e.PATCH("/my/files/:fileID/chunks",
 		chunkHandler.UpsertChunks,
 		authsvc.ValidateStreamToken,

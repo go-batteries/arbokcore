@@ -90,6 +90,8 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 		}
 	}
 
+	fmt.Println("total size ", buffer.Len())
+
 	outputFilePath := fmt.Sprintf("./tmp/outdir/%s", infoResp.Name)
 	outputFile, err := os.Create(outputFilePath)
 	if err != nil {
@@ -104,7 +106,7 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.Stream(http.StatusPartialContent, infoResp.Type, buffer)
+	return c.Attachment(outputFilePath, infoResp.Name)
 }
 
 func (handler *MetadataHandler) PostFileMetadata(c echo.Context) error {
