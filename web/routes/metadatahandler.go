@@ -72,7 +72,7 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 		return c.JSON(resp.Error.HttpStatus, resp)
 	}
 
-	var buffer = bytes.NewBuffer(make([]byte, infoResp.Size))
+	var buffer = bytes.NewBuffer(make([]byte, 0, infoResp.Size))
 
 	for _, filePath := range downloadUrls {
 		file, err := os.Open(filePath)
@@ -83,11 +83,13 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 
 		defer file.Close()
 
-		_, err = io.Copy(buffer, file)
+		w, err := io.Copy(buffer, file)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to copy file chunk into buffer")
 			return c.NoContent(http.StatusInternalServerError)
 		}
+
+		log.Info().Int64("bytes", w).Msg("written chunks")
 	}
 
 	fmt.Println("total size ", buffer.Len())
@@ -99,13 +101,14 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	defer outputFile.Close()
+	defer os.Remove(outputFilePath)
+
 	_, err = io.Copy(outputFile, buffer)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write to output file")
-		outputFile.Close()
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	outputFile.Close()
 
 	return c.Attachment(outputFilePath, infoResp.Name)
 }

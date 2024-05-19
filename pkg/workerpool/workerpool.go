@@ -32,8 +32,8 @@ func NewWorkerPool[E, V any](poolSize int64, processorFunc ProcessorFunc[E, V]) 
 	for i := 0; i < int(poolSize); i++ {
 		workers = append(workers, &Worker[E, V]{
 			ID:        i + 1,
-			Bench:     make(chan E, 1),
-			Processor: processorFunc,
+			Bench:     make(chan E, 1), //Job Chan
+			Processor: processorFunc,   // Worker ProcessorFunc
 			Quit:      make(chan bool),
 		})
 	}
@@ -48,6 +48,16 @@ func NewWorkerPool[E, V any](poolSize int64, processorFunc ProcessorFunc[E, V]) 
 	return pool
 }
 
+// The job of the dispatcher is to recieve an event on a channel
+// This is an external channel. As in not managed by the worker pool
+
+// recieveChan This is the souce of the data.
+// Then it waits to receive a job channel from the workers
+// Then passes on the job in the job channel for the worker
+// At a time, there can be N workers, some of which will be free
+// Some in processing
+// Once the processing completes, The Worker sends back the job channel
+// to the Pool, indicating that it can do work
 func Dispatch[E, V any](ctx context.Context, pool *WorkerPool[E, V], receiveCh chan E) {
 	for {
 		select {
@@ -98,7 +108,7 @@ func Merge[V any](ctx context.Context, chans []chan V, out chan<- V) {
 type Worker[E, V any] struct {
 	ID         int
 	WorkerPool *WorkerPool[E, V]
-	Bench      chan E
+	Bench      chan E // Job channel
 	Processor  ProcessorFunc[E, V]
 	Quit       chan bool
 }
@@ -110,17 +120,17 @@ func (w *Worker[E, V]) Start(ctx context.Context) chan V {
 		defer close(resultCh)
 
 		for {
-			// fmt.Printf("pool %v, bench %v\n", w.WorkerPool, w.Bench)
+			// Here since, the Job Channel is of length 1
+			// So, after each iteration, the buffered Q becomes empty
+			// So we put it Back
 			w.WorkerPool.Pool <- w.Bench
 
 			select {
 
 			case job := <-w.Bench:
 				log.Printf("worker:%d", w.ID)
-				// utils.Dump(job)
 				result := w.Processor(ctx, job)
 				_ = result
-				// utils.Dump(result)
 				// resultCh <- result
 			case <-w.Quit:
 				log.Println("quiting")

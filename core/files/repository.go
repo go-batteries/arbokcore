@@ -91,8 +91,9 @@ type LimitClause struct {
 	Offset int
 }
 
-//TODO: Do this instead for FindBy
-
+// TODO: Do this instead for FindBy
+// We can implement this QueryBuilder
+// But we can use goqu instead
 type QueryBuilder struct {
 	*FindClause
 	*OrderClause

@@ -91,8 +91,17 @@ func (ms *MetadataService) MarkUploadComplete(
 	}
 
 	metadata := results[0]
-	utils.Dump(metadata)
+	// utils.Dump(metadata)
 
+	// Enqueue the PreviousFile ID and File.ID as Message
+
+	// Since this request is sent at the end of the chunk upload request
+	// The assumption is that, the fileID is already present
+	// In the file_metadatas table.
+
+	// So while creating the file_metadatas record for
+	// New version of the file, The new FileID is created
+	// With the PreviousFileID record and populated in DB
 	qdata := CacheMetadata{
 		PrevID: metadata.PrevID,
 		ID:     fileID,
@@ -175,6 +184,7 @@ func (ms *MetadataService) PrepareFileForUpload(
 		)
 	}
 
+	// We build the Token and FileMetadata records to put in DB
 	if err := ms.metaTokensRepo.CreateMetadataToken(
 		ctx,
 		metadata,

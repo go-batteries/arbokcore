@@ -48,6 +48,14 @@ func NewRedisQ(
 	}
 }
 
+// The redis queue is implemented using RPUSH and BLPOP
+// BLPOP returns one message at a time.
+// Here we are using a sequential fetch, even if we did a parallel fetch
+// For 10 records it wouldn't matter and would cause contention or extra headache
+
+// The other thing is, for maintaining integrity, we need to have serializability
+// Understanding database serializability is important here
+
 func (slf *RedisQ) EnqueueMsgs(ctx context.Context, datas []*Payload) (err error) {
 	log.Info().Str("q", slf.queueName).Msg("pushing message to queue")
 

@@ -108,6 +108,16 @@ func (slf *MetadataExecutor) Execute(ctx context.Context, payloads []*queuer.Pay
 		// If prevFileID is null, then mark the upload status as failed
 		// Change the file metadata id to current_flag
 
+		// Here we get the file information with chunks for the PrevFileID and NewFileID
+		// If this is a new file, then there is nothing to compare,
+		// set the current_flag to 1 for NewFileID
+
+		// If not, check for the NChunks of the Previous and NewFiles' metadata
+		// If they are same, check if we need to reconstruct the file chunks
+		// If not, the file is complete new version.
+		// set the current_flag to 1 for NewFileID
+		// set the current_flag to 0 for PrevFileID and the end_date to present date.
+
 		ids := []*string{&cachedData.ID, cachedData.PrevID}
 
 		// fmt.Println("===cached data====")
@@ -137,12 +147,7 @@ func (slf *MetadataExecutor) Execute(ctx context.Context, payloads []*queuer.Pay
 			return err
 		}
 
-		fmt.Println("==========")
-		utils.Dump(filesWithChunks)
-		fmt.Println("==========")
 		resps := files.BuildFilesInfoResponse(filesWithChunks)
-		utils.Dump(resps)
-		fmt.Println("==========")
 
 		log.Info().
 			Int("count", len(resps)).
@@ -158,6 +163,9 @@ func (slf *MetadataExecutor) Execute(ctx context.Context, payloads []*queuer.Pay
 			prevFile *files.FileInfoResponse
 		)
 
+		// Since there are only two records requested
+		// Simple if to determine which file is prev vs which is new
+		// Incase data arrives out of order
 		if resps[0].ID == *(ids[0]) {
 			thisFile = resps[0]
 			prevFile = resps[1]
@@ -338,10 +346,13 @@ func MetadataSupervisor(
 
 	log.Info().Msg("starting metadata changelog supervisor")
 
+	// This is the processorFunc for each worker
 	executor := NewMetadataExecutor(repo, crepo)
-	pool := workerpool.NewWorkerPool(2, executor.Execute)
 
+	// WorkerPool that will Process each Redis Message
+	pool := workerpool.NewWorkerPool(2, executor.Execute)
 	recvChan := producer.Produce(ctx)
+
 	go workerpool.Dispatch(ctx, pool, recvChan)
 
 	pool.Start(ctx)
