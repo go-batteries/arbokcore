@@ -106,7 +106,6 @@ func (tsrepo *TokensRepository) findByTestMode(
 	clause FindByClause,
 ) (*Token, error) {
 
-	var token *Token
 	_ = ctx
 
 	// if clause.ResourceType == "stream" {
@@ -117,17 +116,19 @@ func (tsrepo *TokensRepository) findByTestMode(
 	// 	}
 	// }
 
-	token = &AdminToken
+	allowedTokens := []*Token{&AdminToken, &AnotherToken}
 
-	if token.AccessToken != clause.AccessToken {
-		return nil, ErrTokenNotFound
+	for _, token := range allowedTokens {
+		if token.IsExpired() {
+			return nil, ErrTokenExpired
+		}
+
+		if token.AccessToken == clause.AccessToken {
+			return token, nil
+		}
 	}
 
-	if token.IsExpired() {
-		return nil, ErrTokenExpired
-	}
-
-	return token, nil
+	return nil, ErrTokenNotFound
 }
 
 func (tsrepo *TokensRepository) FindByStreamToken(

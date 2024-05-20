@@ -36,12 +36,19 @@ func getBearerToken(token string) (string, bool) {
 	return strings.TrimSpace(strings.TrimPrefix(token, BearerKey)), true
 }
 
+// What we will do is, set the access_token in localStorage and for both access tokens
+// Set the userID. For the device we will use query params.
+
 func (slf *AuthMidllewareService) ValidateAccessToken(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		log.Info().Msg("validating access token")
 
 		headers := c.Request().Header
 		accessTokenHeader := headers.Get(AccessTokenHeaderKey)
+
+		if accessTokenHeader == "" {
+			accessTokenHeader = c.QueryParam(AccessTokenHeaderKey)
+		}
 
 		if accessTokenHeader == "" {
 			return c.NoContent(http.StatusUnauthorized)

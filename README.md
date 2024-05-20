@@ -44,3 +44,5 @@ Working:
 [Postgres Isolation Levels](https://www.postgresql.org/docs/current/transaction-iso.html)
 
 [Sqlite Isolation](https://www.sqlite.org/isolation.html)
+
+[Server Sent Event, Custom Format](https://developer.mozilla.org/en-US/docs/Web/API/EventSource)

@@ -1,0 +1,30 @@
+
+version: '3.8'
+
+services:
+  server1:
+    build: .
+    environment:
+      - SERVER_ID=server1
+      - DB_PATH=/data/sqlite.db
+    volumes:
+      - ./data:/data
+    networks:
+      - app-network
+
+  server2:
+    build: .
+    environment:
+      - SERVER_ID=server2
+      - DB_PATH=/data/sqlite.db
+    volumes:
+      - ./data:/data
+    networks:
+      - app-network
+
+volumes:
+  db-data:
+
+networks:
+  app-network:
+    driver: bridge

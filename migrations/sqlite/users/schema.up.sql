@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS users (
+	id VARCHAR(48) PRIMARY KEY
+	,user_type VARCHAR(20) NOT NULL
+	,email TEXT NOT NULL
+	,hashedpass TEXT
+	,blocked TINYINT DEFAULT 0
+	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+---
+
+CREATE TABLE IF NOT EXISTS tokens (
+	resource_id VARCHAR(48) NOT NULL
+	,resource_type VARCHAR(20)
+	,user_id VARCHAR(48)
+	,access_token VARCHAR(64)
+	,refresh_token VARCHAR(64)
+	,token_type VARCHAR(20)
+	,access_expires_at TIMESTAMP NOT NULL 
+	,refresh_expires_at TIMESTAMP NOT NULL
+	,created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	,updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

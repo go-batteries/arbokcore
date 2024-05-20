@@ -8,6 +8,7 @@ import (
 	"arbokcore/pkg/config"
 	"arbokcore/pkg/queuer"
 	"arbokcore/pkg/squirtle"
+	"arbokcore/pkg/ssebroker"
 	"arbokcore/web/middlewares"
 	"arbokcore/web/routes"
 	"context"
@@ -30,6 +31,16 @@ const (
 	STREAM_TOKEN_HEADER = "X-Stream-Token"
 )
 
+func SetupSSEeventResponse(c echo.Context) *echo.Response {
+	respHeader := c.Response().Header()
+
+	respHeader.Set(echo.HeaderContentType, "text/event-stream")
+	respHeader.Set(echo.HeaderCacheControl, "no-cache")
+	respHeader.Set(echo.HeaderConnection, "keep-alive")
+
+	return c.Response()
+}
+
 func main() {
 	var port string
 
@@ -41,10 +52,11 @@ func main() {
 
 	conn := database.ConnectSqlite(cfg.DbName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx := context.Background()
+	dbconnctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	dbconn := conn.Connect(ctx)
+	dbconn := conn.Connect(dbconnctx)
 
 	qs := squirtle.LoadAll("./config/querystore.yaml")
 
@@ -99,6 +111,9 @@ func main() {
 	metadataHandler := &routes.MetadataHandler{FileSvc: filesvc}
 	chunkHandler := &routes.ChunkHandler{ChunkSvc: chunkSvc}
 
+	connBrokers := ssebroker.NewBroker()
+	connBrokers.Start(ctx)
+
 	// Echo instance
 	e := echo.New()
 
@@ -106,12 +121,15 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowCredentials: true,
 		AllowHeaders: []string{
 			echo.HeaderOrigin,
 			echo.HeaderContentType,
 			echo.HeaderAccept,
 			echo.HeaderContentDisposition,
+			echo.HeaderConnection,
+			echo.HeaderCacheControl,
 			ACCESS_TOKEN_HEADER,
 			STREAM_TOKEN_HEADER,
 		},
@@ -119,6 +137,9 @@ func main() {
 			echo.HeaderContentLength,
 			echo.HeaderContentDisposition,
 			echo.HeaderContentEncoding,
+			echo.HeaderContentType,
+			echo.HeaderCacheControl,
+			echo.HeaderConnection,
 		},
 	}))
 
@@ -126,6 +147,79 @@ func main() {
 	router := e.Group("arbokcore")
 
 	router.GET("/ping", hello)
+
+	e.GET("/subscribe/devices", func(c echo.Context) error {
+		token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
+		if !ok {
+			log.Error().Msg("token validation not done")
+			return c.NoContent(http.StatusUnauthorized)
+		}
+
+		userID := token.ResourceID
+		deviceID := c.QueryParam("deviceID")
+
+		ok = connBrokers.AddConnection(userID, deviceID)
+		defer connBrokers.RemoveConnection(userID, deviceID)
+
+		connBrokers.Print()
+
+		w := SetupSSEeventResponse(c)
+
+		ctx := c.Request().Context()
+
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("done")
+				return c.NoContent(http.StatusRequestTimeout)
+			default:
+				msg, ok := connBrokers.GetMessage(userID, deviceID)
+				if !ok {
+					log.Info().Msg("fucked")
+
+					w.Flush()
+					// connBrokers.RemoveConnection(userID, deviceID)
+					continue
+				}
+				log.Info().Msg("sending data")
+				fmt.Fprintf(w, "data: %s\n\n", msg)
+				w.Flush()
+			}
+		}
+
+	}, authsvc.ValidateAccessToken)
+
+	go func() {
+		ctx := context.Background()
+
+		for {
+			time.Sleep(5 * time.Second)
+
+			connBrokers.SendMessage(ctx, ssebroker.Message{
+				UserID:   tokens.AdminToken.ResourceID,
+				DeviceID: "1",
+				Content:  []byte("file_id:1|status:success"),
+			})
+
+			connBrokers.SendMessage(ctx, ssebroker.Message{
+				UserID:   tokens.AdminToken.ResourceID,
+				DeviceID: "2",
+				Content:  []byte("file_id:2|status:success"),
+			})
+
+			// connBrokers.SendMessage(ctx, ssebroker.Message{
+			// 	UserID:   tokens.AnotherToken.ResourceID,
+			// 	DeviceID: "1",
+			// 	Content:  []byte("file_id:3|status:success"),
+			// })
+			// connBrokers.SendMessage(ctx, ssebroker.Message{
+			// 	UserID:   tokens.AnotherToken.ResourceID,
+			// 	DeviceID: "2",
+			// 	Content:  []byte("file_id:4|status:success"),
+			// })
+		}
+
+	}()
 
 	e.PATCH("/my/files/:fileID",
 		metadataHandler.UpdateFileMetadata,
