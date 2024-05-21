@@ -61,19 +61,25 @@ func (b *Broker) GetMessage(userID, deviceID string) (string, bool) {
 	return msg, ok
 }
 
+func (b *Broker) getDevices(userID string) (DeviceConnections, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	devices, ok := b.sseEventMap[userID]
+	return devices, ok
+}
+
 func (b *Broker) Start(ctx context.Context) {
 	go func() {
 		for {
-			// fmt.Println("running")
+			fmt.Println("running")
+
 			select {
 			case msg, ok := <-b.messages:
-				// fmt.Println("reading message ", msg, ok)
-				b.mu.RLock()
 
-				devices, ok := b.sseEventMap[msg.UserID]
+				devices, ok := b.getDevices(msg.UserID)
 				if !ok {
 					log.Error().Str("userID", msg.UserID).Msg("failed to get devices")
-					b.mu.RUnlock()
 					continue
 				}
 
@@ -83,25 +89,26 @@ func (b *Broker) Start(ctx context.Context) {
 				for _, device := range devices {
 					wg.Add(1)
 
-					go func() {
-						log.Info().Msg("sending data to device")
+					go func(devise chan string) {
+						fmt.Println("sending data to device")
 
 						defer wg.Done()
 
 						select {
-						case device <- string(msg.Content):
-							// log.Info().Msg("data sent to sse")
+						case devise <- string(msg.Content):
+							fmt.Println("sent sent")
 						case <-time.After(10 * time.Second):
-							log.Warn().Msg("device channel might have expired")
+							fmt.Println("device channel might have expired")
 						case <-ctx.Done():
-							// log.Info().Msg("stopped by ctx")
+							fmt.Println("ending fan out")
 						}
-					}()
-
-					wg.Wait()
+					}(device)
 
 				}
-				b.mu.RUnlock()
+
+				fmt.Println("waiting")
+
+				wg.Wait()
 
 			case <-ctx.Done():
 				log.Info().Msg("sse broker exiting on ctx")
@@ -109,18 +116,6 @@ func (b *Broker) Start(ctx context.Context) {
 			}
 		}
 	}()
-}
-
-func (b *Broker) GetConnection(userID string) (DeviceConnections, bool) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	deviceMap, ok := b.sseEventMap[userID]
-	if !ok {
-		return nil, false
-	}
-
-	return deviceMap, true
 }
 
 func (b *Broker) Print() {
@@ -137,9 +132,9 @@ func (b *Broker) AddConnection(userID string, deviceID string) bool {
 		return true
 	}
 
-	if _, ok := deviceMap[deviceID]; ok {
-		return false
-	}
+	// if _, ok := deviceMap[deviceID]; ok {
+	// 	return false
+	// }
 
 	deviceMap[deviceID] = make(chan string, 1)
 	b.sseEventMap[userID] = deviceMap
@@ -164,6 +159,7 @@ func (b *Broker) RemoveConnection(userID string, deviceID string) {
 	}
 
 	close(device)
+
 	delete(b.sseEventMap[userID], deviceID)
 }
 

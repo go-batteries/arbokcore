@@ -177,7 +177,6 @@ func main() {
 				if !ok {
 					log.Info().Msg("fucked")
 
-					w.Flush()
 					// connBrokers.RemoveConnection(userID, deviceID)
 					continue
 				}
