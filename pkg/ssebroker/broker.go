@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
-type DeviceConnections map[string]chan string
+type DeviceConnections map[string]chan Message
 
 type Message struct {
 	UserID   string
@@ -17,157 +15,126 @@ type Message struct {
 	Content  []byte
 }
 
-type Broker struct {
-	messages    chan Message
-	sseEventMap map[string]DeviceConnections
-	mu          *sync.RWMutex
+type EventData struct {
+	UserID   string
+	DeviceID string
 }
 
-func NewBroker() *Broker {
+func (m Message) Key() string {
+	return fmt.Sprintf("%s_%s", m.UserID, m.DeviceID)
+}
+
+type Broker struct {
+	name          string
+	topicNames    []string
+	messagesCh    chan Message
+	mu            *sync.RWMutex
+	subsciberCh   chan *Topic
+	unsubscribeCh chan *Topic
+}
+
+type Topic struct {
+	Ch      chan Message
+	Name    string
+	Running bool
+	Done    chan bool
+}
+
+func NewBroker(name string) *Broker {
 	return &Broker{
-		messages:    make(chan Message, 1),
-		mu:          &sync.RWMutex{},
-		sseEventMap: make(map[string]DeviceConnections),
+		name:          name,
+		messagesCh:    make(chan Message, 1),
+		mu:            &sync.RWMutex{},
+		topicNames:    []string{},
+		subsciberCh:   make(chan *Topic, 1),
+		unsubscribeCh: make(chan *Topic, 1),
 	}
+}
+
+func (b *Broker) Subscribe(ctx context.Context, topicName string) chan Message {
+	fmt.Println("signal broker to add subscriber")
+
+	receiver := make(chan Message, 1)
+	b.subsciberCh <- &Topic{Name: topicName, Ch: receiver}
+
+	fmt.Println("signal broker to add subscriber done")
+	return receiver
+}
+
+func (b *Broker) Unsubscribe(ctx context.Context, topicName string) {
+	fmt.Println("broker to remove subscriber")
+
+	doneCh := make(chan bool)
+	b.unsubscribeCh <- &Topic{Name: topicName, Done: doneCh}
+	fmt.Println("signal broker to remove subscriber")
+
+	<-doneCh
+	fmt.Println("broker unsubscribed")
 }
 
 func (b *Broker) SendMessage(ctx context.Context, data Message) {
 	select {
-	case b.messages <- data:
-		log.Info().Msg("data sent")
-	case <-time.After(10 * time.Second):
-		fmt.Println(data)
-		log.Info().Msg("failed to send message")
+	case b.messagesCh <- data:
+	case <-time.After(9 * time.Second):
+		fmt.Println("failed to send message ", data)
 	}
-}
-
-func (b *Broker) GetMessage(userID, deviceID string) (string, bool) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	deviceMap, ok := b.sseEventMap[userID]
-	if !ok {
-		log.Error().Msg("failed to get device map")
-		return "", false
-	}
-
-	device, ok := deviceMap[deviceID]
-	if !ok {
-		log.Error().Msg("failed to get device")
-		return "", false
-	}
-
-	msg, ok := <-device
-	return msg, ok
-}
-
-func (b *Broker) getDevices(userID string) (DeviceConnections, bool) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-
-	devices, ok := b.sseEventMap[userID]
-	return devices, ok
 }
 
 func (b *Broker) Start(ctx context.Context) {
+	topics := make(DeviceConnections)
+
 	go func() {
 		for {
-			fmt.Println("running")
-
 			select {
-			case msg, ok := <-b.messages:
-
-				devices, ok := b.getDevices(msg.UserID)
+			case <-ctx.Done():
+				fmt.Println("ctx done")
+				return
+			case subs, ok := <-b.subsciberCh:
 				if !ok {
-					log.Error().Str("userID", msg.UserID).Msg("failed to get devices")
+					fmt.Println("failed to get subscriber channel")
 					continue
 				}
 
-				var wg sync.WaitGroup
-				// We need to check for active devices.
-
-				for _, device := range devices {
-					wg.Add(1)
-
-					go func(devise chan string) {
-						fmt.Println("sending data to device")
-
-						defer wg.Done()
-
-						select {
-						case devise <- string(msg.Content):
-							fmt.Println("sent sent")
-						case <-time.After(10 * time.Second):
-							fmt.Println("device channel might have expired")
-						case <-ctx.Done():
-							fmt.Println("ending fan out")
-						}
-					}(device)
-
+				rec, ok := topics[subs.Name]
+				if ok {
+					fmt.Println("existing subscriber found", rec)
+					continue
 				}
 
-				fmt.Println("waiting")
+				subs.Running = true
+				topics[subs.Name] = subs.Ch
+			case subs, ok := <-b.unsubscribeCh:
+				ch, ok := topics[subs.Name]
+				if !ok {
+					fmt.Println("channel not found")
+					continue
+				}
 
-				wg.Wait()
+				subs.Running = false
+				subs.Done <- true
+				close(subs.Done)
 
-			case <-ctx.Done():
-				log.Info().Msg("sse broker exiting on ctx")
-				return
+				delete(topics, subs.Name)
+				close(ch)
+			case msg, ok := <-b.messagesCh:
+				if !ok {
+					fmt.Println("no messages received")
+					continue
+				}
+
+				ch, ok := topics[msg.Key()]
+				if !ok {
+					fmt.Println("no channels active for topic")
+					continue
+				}
+
+				select {
+				case ch <- msg:
+				case <-time.After(10 * time.Second):
+					fmt.Println("failed to send msg to channel", msg)
+				}
+
 			}
 		}
 	}()
-}
-
-func (b *Broker) Print() {
-	fmt.Printf("sse veent map %v:\n", b.sseEventMap)
-}
-
-func (b *Broker) AddConnection(userID string, deviceID string) bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	deviceMap, ok := b.sseEventMap[userID]
-	if !ok {
-		b.sseEventMap[userID] = DeviceConnections{deviceID: make(chan string, 1)}
-		return true
-	}
-
-	// if _, ok := deviceMap[deviceID]; ok {
-	// 	return false
-	// }
-
-	deviceMap[deviceID] = make(chan string, 1)
-	b.sseEventMap[userID] = deviceMap
-
-	return true
-}
-
-func (b *Broker) RemoveConnection(userID string, deviceID string) {
-	log.Info().Msg("removing connection")
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	deviceMap, ok := b.sseEventMap[userID]
-	if !ok {
-		return
-	}
-
-	device, ok := deviceMap[deviceID]
-	if !ok {
-		return
-	}
-
-	close(device)
-
-	delete(b.sseEventMap[userID], deviceID)
-}
-
-func (b *Broker) FlushUserConns(userID string) {
-	_, ok := b.sseEventMap[userID]
-	if !ok {
-		return
-	}
-
-	delete(b.sseEventMap, userID)
 }

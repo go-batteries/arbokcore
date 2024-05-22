@@ -111,9 +111,6 @@ func main() {
 	metadataHandler := &routes.MetadataHandler{FileSvc: filesvc}
 	chunkHandler := &routes.ChunkHandler{ChunkSvc: chunkSvc}
 
-	connBrokers := ssebroker.NewBroker()
-	connBrokers.Start(ctx)
-
 	// Echo instance
 	e := echo.New()
 
@@ -143,6 +140,9 @@ func main() {
 		},
 	}))
 
+	subscriber := ssebroker.NewBroker("file_events")
+	subscriber.Start(context.Background())
+
 	// Routes
 	router := e.Group("arbokcore")
 
@@ -155,33 +155,30 @@ func main() {
 			return c.NoContent(http.StatusUnauthorized)
 		}
 
+		ctx := c.Request().Context()
 		userID := token.ResourceID
 		deviceID := c.QueryParam("deviceID")
 
-		ok = connBrokers.AddConnection(userID, deviceID)
-		defer connBrokers.RemoveConnection(userID, deviceID)
-
-		connBrokers.Print()
-
 		w := SetupSSEeventResponse(c)
 
-		ctx := c.Request().Context()
+		topicName := fmt.Sprintf("%s_%s", userID, deviceID)
+		receiver := subscriber.Subscribe(ctx, topicName)
+
+		defer func(_topicName string) {
+			fmt.Println("deregistering", topicName, userID, deviceID)
+			subscriber.Unsubscribe(ctx, _topicName)
+		}(topicName)
+
+		// ticker := time.NewTicker(1 * time.Second)
 
 		for {
 			select {
 			case <-ctx.Done():
 				fmt.Println("done")
 				return c.NoContent(http.StatusRequestTimeout)
-			default:
-				msg, ok := connBrokers.GetMessage(userID, deviceID)
-				if !ok {
-					log.Info().Msg("fucked")
-
-					// connBrokers.RemoveConnection(userID, deviceID)
-					continue
-				}
-				log.Info().Msg("sending data")
-				fmt.Fprintf(w, "data: %s\n\n", msg)
+			case data, ok := <-receiver:
+				fmt.Println(data, ok)
+				fmt.Fprintf(w, "data: %s\n\n", "userID:"+userID+",deviceID:"+deviceID+",key:"+string(data.Content))
 				w.Flush()
 			}
 		}
@@ -190,35 +187,45 @@ func main() {
 
 	go func() {
 		ctx := context.Background()
+		ticker := time.NewTicker(5 * time.Second)
 
 		for {
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ticker.C:
+				subscriber.SendMessage(ctx, ssebroker.Message{
+					UserID:   tokens.AdminToken.ResourceID,
+					DeviceID: "1",
+					Content:  []byte("file_id:1|status:success"),
+				})
 
-			connBrokers.SendMessage(ctx, ssebroker.Message{
-				UserID:   tokens.AdminToken.ResourceID,
-				DeviceID: "1",
-				Content:  []byte("file_id:1|status:success"),
-			})
-
-			connBrokers.SendMessage(ctx, ssebroker.Message{
-				UserID:   tokens.AdminToken.ResourceID,
-				DeviceID: "2",
-				Content:  []byte("file_id:2|status:success"),
-			})
-
-			// connBrokers.SendMessage(ctx, ssebroker.Message{
-			// 	UserID:   tokens.AnotherToken.ResourceID,
-			// 	DeviceID: "1",
-			// 	Content:  []byte("file_id:3|status:success"),
-			// })
-			// connBrokers.SendMessage(ctx, ssebroker.Message{
-			// 	UserID:   tokens.AnotherToken.ResourceID,
-			// 	DeviceID: "2",
-			// 	Content:  []byte("file_id:4|status:success"),
-			// })
+				subscriber.SendMessage(ctx, ssebroker.Message{
+					UserID:   tokens.AdminToken.ResourceID,
+					DeviceID: "2",
+					Content:  []byte("file_id:2|status:success"),
+				})
+			}
 		}
-
 	}()
+	//
+	// connBrokers.SendMessage(ctx, ssebroker.Message{
+	// 	UserID:   tokens.AdminToken.ResourceID,
+	// 	DeviceID: "2",
+	// 	Content:  []byte("file_id:2|status:success"),
+	// })
+
+	// connBrokers.SendMessage(ctx, ssebroker.Message{
+	// 	UserID:   tokens.AnotherToken.ResourceID,
+	// 	DeviceID: "1",
+	// 	Content:  []byte("file_id:3|status:success"),
+	// })
+	// connBrokers.SendMessage(ctx, ssebroker.Message{
+	// 	UserID:   tokens.AnotherToken.ResourceID,
+	// 	DeviceID: "2",
+	// 	Content:  []byte("file_id:4|status:success"),
+	// })
+	// 	}
+	//
+	// }()
 
 	e.PATCH("/my/files/:fileID",
 		metadataHandler.UpdateFileMetadata,

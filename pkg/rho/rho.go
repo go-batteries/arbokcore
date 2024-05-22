@@ -1,8 +1,8 @@
 package rho
 
-type MapperFunc[E, V comparable] func(E, int) V
+type MapperFunc[E, V any] func(E, int) V
 
-func Map[E, V comparable](arr []E, mapper MapperFunc[E, V]) []V {
+func Map[E, V any](arr []E, mapper MapperFunc[E, V]) []V {
 	values := []V{}
 
 	for i, el := range arr {
