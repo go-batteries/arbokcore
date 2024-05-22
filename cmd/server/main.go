@@ -177,7 +177,12 @@ func main() {
 				fmt.Println("done")
 				return c.NoContent(http.StatusRequestTimeout)
 			case data, ok := <-receiver:
-				fmt.Println(data, ok)
+				// fmt.Println(data, ok)
+				if !ok {
+					log.Error().Msg("failed to receive sse data")
+					continue
+				}
+
 				fmt.Fprintf(w, "data: %s\n\n", "userID:"+userID+",deviceID:"+deviceID+",key:"+string(data.Content))
 				w.Flush()
 			}

@@ -203,6 +203,8 @@ func (ms *MetadataService) PrepareFileForUpload(
 		UploadStatus: StatusUploading,
 		CreatedAt:    token.CreatedAt,
 		ExpiresIn:    tokens.ShortExpiryDuration,
+		Digest:       metadata.FileHash,
+		FileType:     metadata.FileType,
 	})
 }
 
@@ -211,6 +213,8 @@ type MetadataTokenResponse struct {
 	StreamToken  string        `json:"streamToken,omitempty"`
 	PrevID       *string       `json:"prevID"`
 	FileID       string        `json:"fileID"`
+	FileType     string        `json:"fileType"`
+	Digest       string        `json:"fileHash"`
 	UploadStatus string        `json:"uploadStatus"`
 	CreatedAt    time.Time     `json:"createdAt"`
 	ExpiresIn    time.Duration `json:"expiresAt"`

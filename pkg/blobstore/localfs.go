@@ -105,7 +105,6 @@ func (slf *LocalFS) UpdateChunk(ctx context.Context, fileID string, chunk *Chunk
 	var byt bytes.Buffer
 	byt.ReadFrom(chunk.data)
 
-	fmt.Println("dhir bal", len(byt.String()))
 	chunk.data.Seek(0, io.SeekStart)
 
 	tracker = utils.Bench2("copy file")

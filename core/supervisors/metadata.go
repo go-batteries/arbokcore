@@ -4,7 +4,6 @@ import (
 	"arbokcore/core/database"
 	"arbokcore/core/files"
 	"arbokcore/pkg/queuer"
-	"arbokcore/pkg/utils"
 	"arbokcore/pkg/workerpool"
 	"bytes"
 	"context"
@@ -272,8 +271,8 @@ func RestOfChunks(thisFile, prevFile *files.FileInfoResponse) map[string]*files.
 		matchedChunks[chunkIDstr] = chunk
 	}
 
-	fmt.Println("matching chunks")
-	utils.Dump(matchedChunks)
+	// fmt.Println("matching chunks")
+	// utils.Dump(matchedChunks)
 
 	return matchedChunks
 }

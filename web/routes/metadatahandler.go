@@ -92,7 +92,7 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 		log.Info().Int64("bytes", w).Msg("written chunks")
 	}
 
-	fmt.Println("total size ", buffer.Len())
+	log.Info().Int("buffer len", buffer.Len()).Msg("total size of buffer")
 
 	outputFilePath := fmt.Sprintf("./tmp/outdir/%s", infoResp.Name)
 	outputFile, err := os.Create(outputFilePath)
