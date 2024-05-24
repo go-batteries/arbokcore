@@ -33,7 +33,7 @@ func Test_RedisEnqueue(t *testing.T) {
 
 	msgs := []string{"message1", "message2", "message3"}
 	for _, msg := range msgs {
-		err := rq.EnqueueMsg(ctx, &Payload{
+		err := rq.EnqueueMsg(ctx, "", &Payload{
 			Message: []byte(msg),
 		})
 
@@ -43,7 +43,7 @@ func Test_RedisEnqueue(t *testing.T) {
 	values := []string{}
 
 	for i := 0; i < 3; i++ {
-		data, err := rq.ReadMsg(ctx, "does not matter")
+		data, err := rq.ReadMsg(ctx, "", "does not matter")
 		require.NoError(t, err)
 
 		result := string(data.Message)

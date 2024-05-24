@@ -1,6 +1,7 @@
 package queuer
 
 import (
+	"arbokcore/pkg/templating"
 	"context"
 	"errors"
 	"time"
@@ -25,14 +26,14 @@ func (perr PartialError) Error() string {
 }
 
 type Queuer interface {
-	EnqueueMsg(ctx context.Context, data *Payload) error
-	EnqueueMsgs(ctx context.Context, data []*Payload) error
-	ReadMsg(ctx context.Context, key string) (*Payload, error)
+	EnqueueMsg(ctx context.Context, partition string, data *Payload) error
+	EnqueueMsgs(ctx context.Context, partition string, data []*Payload) error
+	ReadMsg(ctx context.Context, partition string, key string) (*Payload, error)
 }
 
 type RedisQ struct {
 	conn      *redis.Client
-	queueName string
+	topicName string
 	timeout   time.Duration
 }
 
@@ -43,7 +44,7 @@ func NewRedisQ(
 ) *RedisQ {
 	return &RedisQ{
 		conn:      conn,
-		queueName: queueName,
+		topicName: queueName,
 		timeout:   timeout,
 	}
 }
@@ -56,13 +57,13 @@ func NewRedisQ(
 // The other thing is, for maintaining integrity, we need to have serializability
 // Understanding database serializability is important here
 
-func (slf *RedisQ) EnqueueMsgs(ctx context.Context, datas []*Payload) (err error) {
-	log.Info().Str("q", slf.queueName).Msg("pushing message to queue")
+func (slf *RedisQ) EnqueueMsgs(ctx context.Context, partition string, datas []*Payload) (err error) {
+	log.Info().Str("q", slf.topicName).Msg("pushing message to queue")
 
 	failed := []*Payload{}
 
 	for _, data := range datas {
-		err = slf.conn.RPush(ctx, slf.queueName, string(data.Message)).Err()
+		err = slf.conn.RPush(ctx, slf.topicName, string(data.Message)).Err()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to push message to queue")
 			failed = append(failed, data)
@@ -80,10 +81,11 @@ func (slf *RedisQ) EnqueueMsgs(ctx context.Context, datas []*Payload) (err error
 	}
 }
 
-func (slf *RedisQ) EnqueueMsg(ctx context.Context, data *Payload) (err error) {
-	log.Info().Str("q", slf.queueName).Msg("pushing message to queue")
+func (slf *RedisQ) EnqueueMsg(ctx context.Context, partition string, data *Payload) (err error) {
+	queue := templating.NewTemplateString(slf.topicName)(partition)
+	log.Info().Str("q", queue).Msg("pushing message to queue")
 
-	err = slf.conn.RPush(ctx, slf.queueName, string(data.Message)).Err()
+	err = slf.conn.RPush(ctx, queue, string(data.Message)).Err()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to push message to queue")
 	}
@@ -95,10 +97,11 @@ var (
 	ErrEmptyRecords = errors.New("empty_records")
 )
 
-func (slf *RedisQ) ReadMsg(ctx context.Context, key string) (data *Payload, err error) {
-	log.Info().Str("q", slf.queueName).Msg("reading messages from queue")
+func (slf *RedisQ) ReadMsg(ctx context.Context, partition string, key string) (data *Payload, err error) {
+	queue := templating.NewTemplateString(slf.topicName)(partition)
+	log.Info().Str("q", queue).Msg("reading messages from queue")
 
-	results, err := slf.conn.BLPop(ctx, slf.timeout, slf.queueName).Result()
+	results, err := slf.conn.BLPop(ctx, slf.timeout, slf.topicName).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			// log.Info().Msg("no results in queue")

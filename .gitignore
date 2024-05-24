@@ -1,3 +1,4 @@
 tmp/
+cmd/test/
 *.sqlite3*
 

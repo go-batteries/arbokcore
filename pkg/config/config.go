@@ -8,6 +8,7 @@ import (
 )
 
 type AppConfig struct {
+	ServerID    string
 	Environment string
 	Dsn         string
 	DbName      string
@@ -33,6 +34,7 @@ func Load(envFile string) AppConfig {
 
 	return AppConfig{
 		Environment: env,
+		ServerID:    cfgMap.MustGet("server_id").(string),
 		Dsn:         cfgMap.MustGet("dsn").(string),
 		DbName:      cfgMap.MustGet("db_name").(string),
 		RedisURL:    cfgMap.MustGet("redis_url").(string),

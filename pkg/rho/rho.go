@@ -13,9 +13,9 @@ func Map[E, V any](arr []E, mapper MapperFunc[E, V]) []V {
 	return values
 }
 
-type FilterFunc[E comparable] func(E, int) bool
+type FilterFunc[E any] func(E, int) bool
 
-func Filter[E comparable](arr []E, filter FilterFunc[E]) []E {
+func Filter[E any](arr []E, filter FilterFunc[E]) []E {
 	values := []E{}
 
 	for i, el := range arr {

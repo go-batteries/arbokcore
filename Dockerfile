@@ -1,14 +1,14 @@
 # Dockerfile
-FROM golang:1.18-alpine
+FROM golang:1.22-alpine
 
 WORKDIR /app
 
 COPY . .
 
 RUN go mod tidy
-RUN go build -o server .
+RUN go build -ldflags "-w" -o arbokcore cmd/server/main.go
 
-EXPOSE 8080
+EXPOSE 9191
 
-CMD ["./server"]
+CMD ["./arbokcore"]
 

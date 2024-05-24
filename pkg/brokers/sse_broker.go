@@ -1,9 +1,8 @@
-package ssebroker
+package brokers
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -28,7 +27,6 @@ type Broker struct {
 	name          string
 	topicNames    []string
 	messagesCh    chan Message
-	mu            *sync.RWMutex
 	subsciberCh   chan *Topic
 	unsubscribeCh chan *Topic
 }
@@ -40,11 +38,10 @@ type Topic struct {
 	Done    chan bool
 }
 
-func NewBroker(name string) *Broker {
+func NewSSEBroker(name string) *Broker {
 	return &Broker{
 		name:          name,
 		messagesCh:    make(chan Message, 1),
-		mu:            &sync.RWMutex{},
 		topicNames:    []string{},
 		subsciberCh:   make(chan *Topic, 1),
 		unsubscribeCh: make(chan *Topic, 1),

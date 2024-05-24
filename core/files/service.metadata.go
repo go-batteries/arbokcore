@@ -103,6 +103,7 @@ func (ms *MetadataService) MarkUploadComplete(
 	// New version of the file, The new FileID is created
 	// With the PreviousFileID record and populated in DB
 	qdata := CacheMetadata{
+		UserID: metadata.UserID,
 		PrevID: metadata.PrevID,
 		ID:     fileID,
 	}
@@ -112,7 +113,7 @@ func (ms *MetadataService) MarkUploadComplete(
 
 	err = enc.Encode(qdata)
 	if err == nil {
-		err = ms.queue.EnqueueMsg(ctx, &queuer.Payload{
+		err = ms.queue.EnqueueMsg(ctx, "", &queuer.Payload{
 			Message: buf.Bytes(),
 		})
 	}

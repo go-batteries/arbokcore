@@ -1,4 +1,4 @@
-package ssebroker
+package brokers
 
 import (
 	"arbokcore/pkg/rho"
@@ -11,7 +11,7 @@ import (
 func Test_BrokerSubscription(t *testing.T) {
 	ctx := context.Background()
 
-	broker := NewBroker("test_sse")
+	broker := NewSSEBroker("test_sse")
 	broker.Start(ctx)
 
 	receiver1 := broker.Subscribe(ctx, "user1_device1")

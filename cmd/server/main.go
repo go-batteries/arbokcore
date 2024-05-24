@@ -5,10 +5,10 @@ import (
 	"arbokcore/core/files"
 	"arbokcore/core/tokens"
 	"arbokcore/pkg/blobstore"
+	"arbokcore/pkg/brokers"
 	"arbokcore/pkg/config"
 	"arbokcore/pkg/queuer"
 	"arbokcore/pkg/squirtle"
-	"arbokcore/pkg/ssebroker"
 	"arbokcore/web/middlewares"
 	"arbokcore/web/routes"
 	"context"
@@ -87,7 +87,7 @@ func main() {
 
 	metadataQ := queuer.NewRedisQ(
 		redisConn,
-		database.MetadataRedisQueue,
+		database.MetadataFileUpdateQueue,
 		20*time.Second,
 	)
 
@@ -140,7 +140,7 @@ func main() {
 		},
 	}))
 
-	subscriber := ssebroker.NewBroker("file_events")
+	subscriber := brokers.NewSSEBroker("file_events")
 	subscriber.Start(context.Background())
 
 	// Routes
@@ -197,13 +197,13 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				subscriber.SendMessage(ctx, ssebroker.Message{
+				subscriber.SendMessage(ctx, brokers.Message{
 					UserID:   tokens.AdminToken.ResourceID,
 					DeviceID: "1",
 					Content:  []byte("file_id:1|status:success"),
 				})
 
-				subscriber.SendMessage(ctx, ssebroker.Message{
+				subscriber.SendMessage(ctx, brokers.Message{
 					UserID:   tokens.AdminToken.ResourceID,
 					DeviceID: "2",
 					Content:  []byte("file_id:2|status:success"),

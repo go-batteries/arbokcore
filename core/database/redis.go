@@ -8,7 +8,10 @@ import (
 )
 
 const (
-	MetadataRedisQueue = "metadata_q"
+	MetadataFileUpdateQueue = "q::metadata::update::file"
+
+	// Per user queue
+	MetadataUpdateClientsNotifierQueue = "q::metadata::update::clients::%s"
 )
 
 func NewRedisConnection(redisURL string) (*redis.Client, error) {
