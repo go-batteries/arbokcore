@@ -30,9 +30,10 @@ type FileMetadata struct {
 }
 
 type CacheMetadata struct {
-	UserID string  `json:"userID" db:"user_id"`
-	PrevID *string `json:"prevID" db:"prev_id"`
-	ID     string  `json:"id" db:"id"`
+	UserID   string  `json:"userID" db:"user_id"`
+	PrevID   *string `json:"prevID" db:"prev_id"`
+	DeviceID string  `json:"deviceID" db:"-"`
+	ID       string  `json:"id" db:"id"`
 }
 
 type UserFile struct {

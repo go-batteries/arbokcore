@@ -16,11 +16,19 @@ type Token struct {
 	RefreshToken string  `db:"refresh_token"`
 	TokenType    string  `db:"token_type"`
 	UserID       *string `db:"user_id"`
+	DeviceID     string  `db:"-"`
 
 	AccessExpiresAt  time.Time `db:"access_expires_at"`
 	RefreshExpiresAt time.Time `db:"refresh_expires_at"`
 
 	database.Timestamp
+}
+
+type UserFileDevice struct {
+	UserID   string
+	DeviceID string
+	FileID   string
+	ChunkID  string
 }
 
 func (token *Token) IsExpired() bool {

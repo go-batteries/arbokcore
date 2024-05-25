@@ -5,6 +5,7 @@ import (
 	"arbokcore/core/files"
 	"arbokcore/core/notifiers"
 	"arbokcore/pkg/queuer"
+	"arbokcore/pkg/utils"
 	"arbokcore/pkg/workerpool"
 	"bytes"
 	"context"
@@ -236,6 +237,7 @@ func (slf *MetadataExecutor) ExecuteEach(ctx context.Context, cachedData *files.
 func (slf *MetadataExecutor) Execute(ctx context.Context, payloads []*queuer.Payload) error {
 	//Ideally there should be only 1 here
 	fmt.Printf("len of payloads %d, payloads %+v\n", len(payloads), payloads)
+	defer utils.Bench2("metadata_executor")()
 
 	updateSuccessEvents := []*notifiers.MetadataUpdateStatusEvent{}
 
@@ -258,12 +260,16 @@ func (slf *MetadataExecutor) Execute(ctx context.Context, payloads []*queuer.Pay
 		err = slf.ExecuteEach(ctx, &cachedData)
 		if err != nil {
 			return err
-		} else {
-			updateSuccessEvents = append(updateSuccessEvents, &notifiers.MetadataUpdateStatusEvent{
-				FileID: cachedData.ID,
-				UserID: cachedData.UserID,
-			})
 		}
+
+		fmt.Println("sending to notify")
+		utils.Dump(cachedData)
+
+		updateSuccessEvents = append(updateSuccessEvents, &notifiers.MetadataUpdateStatusEvent{
+			FileID:   cachedData.ID,
+			UserID:   cachedData.UserID,
+			DeviceID: cachedData.DeviceID,
+		})
 	}
 
 	// From here on, once the sync is complete
@@ -368,7 +374,7 @@ func MetadataSupervisor(
 	executor := NewMetadataExecutor(repo, crepo, notifier)
 
 	// WorkerPool that will Process each Redis Message
-	pool := workerpool.NewWorkerPool(2, executor.Execute)
+	pool := workerpool.NewWorkerPool(10, executor.Execute)
 	recvChan := producer.Produce(ctx)
 
 	go workerpool.Dispatch(ctx, pool, recvChan)

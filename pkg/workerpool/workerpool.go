@@ -62,6 +62,7 @@ func Dispatch[E, V any](ctx context.Context, pool *WorkerPool[E, V], receiveCh c
 	for {
 		select {
 		case job := <-receiveCh:
+			// Wrap in a go routine?
 			jobChan := <-pool.Pool
 			jobChan <- job
 		case <-ctx.Done():

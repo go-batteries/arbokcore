@@ -45,7 +45,9 @@ func (handler *MetadataHandler) MarkUploadComplete(c echo.Context) error {
 		return c.NoContent(http.StatusBadRequest)
 	}
 
-	resp := handler.FileSvc.MarkUploadComplete(ctx, token.ResourceID)
+	log.Info().Msg("deviceID: " + token.DeviceID)
+	data := tokens.UserFileDevice{FileID: token.ResourceID, DeviceID: token.DeviceID}
+	resp := handler.FileSvc.MarkUploadComplete(ctx, &data)
 	if !resp.Success {
 		return c.JSON(resp.Error.HttpStatus, resp)
 	}

@@ -139,6 +139,12 @@ func (slf *AuthMidllewareService) ValidateStreamToken(next echo.HandlerFunc) ech
 		}
 
 		ctx := c.Request().Context()
+
+		deviceID := "1"
+		if accessToken == tokens.AnotherToken.AccessToken {
+			deviceID = "2"
+		}
+
 		token, err := slf.repo.FindByStreamToken(ctx, tokens.FindByClause{
 			ResourceType: "stream",
 			ResourceID:   fileID,
@@ -151,6 +157,9 @@ func (slf *AuthMidllewareService) ValidateStreamToken(next echo.HandlerFunc) ech
 			log.Error().Err(err).Msg("failed to validate stream token")
 			return c.NoContent(http.StatusUnauthorized)
 		}
+
+		//TODO: remove
+		token.DeviceID = deviceID
 
 		c.Set(TokenContextKey, token)
 

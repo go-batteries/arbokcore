@@ -11,6 +11,7 @@ var AdminToken = Token{
 	AccessToken:  "trial_access_token",
 	RefreshToken: "trial_refresh_token",
 	TokenType:    "user",
+	DeviceID:     "1",
 
 	AccessExpiresAt:  database.Now().Add(1 * time.Hour),
 	RefreshExpiresAt: database.Now().Add(5 * time.Hour),
@@ -24,6 +25,7 @@ var AnotherToken = Token{
 	AccessToken:  "trial_access_token_1",
 	RefreshToken: "trial_refresh_token_1",
 	TokenType:    "user",
+	DeviceID:     "2",
 
 	AccessExpiresAt:  database.Now().Add(1 * time.Hour),
 	RefreshExpiresAt: database.Now().Add(5 * time.Hour),
@@ -38,6 +40,7 @@ var StreamToken = Token{
 	RefreshToken: "trial_stream_refresh_token",
 	TokenType:    "stream",
 	UserID:       &AdminToken.ResourceID,
+	DeviceID:     "1",
 
 	AccessExpiresAt:  time.Now().Add(1 * time.Hour),
 	RefreshExpiresAt: time.Now().Add(5 * time.Hour),

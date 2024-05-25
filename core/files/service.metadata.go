@@ -77,13 +77,13 @@ func (ms MetadataService) ListOrderedFileChunks(ctx context.Context, fileID stri
 
 func (ms *MetadataService) MarkUploadComplete(
 	ctx context.Context,
-	fileID string,
+	userFileDevice *tokens.UserFileDevice,
 ) api.Response {
 
 	log.Info().Msg("marking file upload as complete")
 
 	results, err := ms.repo.FindBy(ctx, FindClause{
-		{Key: "id", Operator: "=", Val: fileID},
+		{Key: "id", Operator: "=", Val: userFileDevice.FileID},
 		{Key: "upload_status", Operator: "=", Val: StatusUploading},
 	})
 	if err != nil || len(results) == 0 {
@@ -103,10 +103,14 @@ func (ms *MetadataService) MarkUploadComplete(
 	// New version of the file, The new FileID is created
 	// With the PreviousFileID record and populated in DB
 	qdata := CacheMetadata{
-		UserID: metadata.UserID,
-		PrevID: metadata.PrevID,
-		ID:     fileID,
+		UserID:   metadata.UserID,
+		PrevID:   metadata.PrevID,
+		ID:       userFileDevice.FileID,
+		DeviceID: userFileDevice.DeviceID,
 	}
+
+	// fmt.Println("eof qdata")
+	// utils.Dump(qdata)
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)

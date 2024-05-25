@@ -1,6 +1,7 @@
 package brokers
 
 import (
+	"arbokcore/pkg/utils"
 	"context"
 	"fmt"
 	"time"
@@ -23,7 +24,7 @@ func (m Message) Key() string {
 	return fmt.Sprintf("%s_%s", m.UserID, m.DeviceID)
 }
 
-type Broker struct {
+type SSEBroker struct {
 	name          string
 	topicNames    []string
 	messagesCh    chan Message
@@ -32,14 +33,15 @@ type Broker struct {
 }
 
 type Topic struct {
-	Ch      chan Message
-	Name    string
-	Running bool
-	Done    chan bool
+	Ch        chan Message
+	Partition string
+	Name      string
+	Running   bool
+	Done      chan bool
 }
 
-func NewSSEBroker(name string) *Broker {
-	return &Broker{
+func NewSSEBroker(name string) *SSEBroker {
+	return &SSEBroker{
 		name:          name,
 		messagesCh:    make(chan Message, 1),
 		topicNames:    []string{},
@@ -48,7 +50,7 @@ func NewSSEBroker(name string) *Broker {
 	}
 }
 
-func (b *Broker) Subscribe(ctx context.Context, topicName string) chan Message {
+func (b *SSEBroker) Subscribe(ctx context.Context, topicName string) chan Message {
 	fmt.Println("signal broker to add subscriber")
 
 	receiver := make(chan Message, 1)
@@ -58,7 +60,7 @@ func (b *Broker) Subscribe(ctx context.Context, topicName string) chan Message {
 	return receiver
 }
 
-func (b *Broker) Unsubscribe(ctx context.Context, topicName string) {
+func (b *SSEBroker) Unsubscribe(ctx context.Context, topicName string) {
 	fmt.Println("broker to remove subscriber")
 
 	doneCh := make(chan bool)
@@ -69,15 +71,17 @@ func (b *Broker) Unsubscribe(ctx context.Context, topicName string) {
 	fmt.Println("broker unsubscribed")
 }
 
-func (b *Broker) SendMessage(ctx context.Context, data Message) {
+func (b *SSEBroker) SendMessage(ctx context.Context, data Message) {
 	select {
 	case b.messagesCh <- data:
+		fmt.Println("sending data")
+		utils.Dump(data)
 	case <-time.After(9 * time.Second):
 		fmt.Println("failed to send message ", data)
 	}
 }
 
-func (b *Broker) Start(ctx context.Context) {
+func (b *SSEBroker) Start(ctx context.Context) {
 	topics := make(DeviceConnections)
 
 	go func() {
@@ -100,6 +104,7 @@ func (b *Broker) Start(ctx context.Context) {
 
 				subs.Running = true
 				topics[subs.Name] = subs.Ch
+
 			case subs, ok := <-b.unsubscribeCh:
 				ch, ok := topics[subs.Name]
 				if !ok {
@@ -113,6 +118,7 @@ func (b *Broker) Start(ctx context.Context) {
 
 				delete(topics, subs.Name)
 				close(ch)
+
 			case msg, ok := <-b.messagesCh:
 				if !ok {
 					fmt.Println("no messages received")

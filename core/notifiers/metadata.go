@@ -21,9 +21,9 @@ func NewMedataUpdateStatus(queue queuer.Queuer) *MetadataUpdateStatus {
 }
 
 type MetadataUpdateStatusEvent struct {
-	FileID string
-	UserID string
-	// DeviceID string
+	FileID   string
+	UserID   string
+	DeviceID string
 }
 
 type PayloadMap struct {
@@ -54,15 +54,15 @@ func (ms *MetadataUpdateStatus) Notify(ctx context.Context, events []*MetadataUp
 		Int("payloads_count", len(payloads)).
 		Msg("total payloads from events")
 
-	payloads = rho.Filter(payloads, func(p *PayloadMap, i int) bool {
-		return p != nil
-	})
-
 	log.Info().Int("payloads_count", len(payloads)).Msg("payload count after filter")
 
 	perr := queuer.PartialError{}
 
 	for _, payload := range payloads {
+		if payload == nil {
+			continue
+		}
+
 		err := ms.queue.EnqueueMsg(ctx, payload.userID, &payload.payload)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to enqueue messages")

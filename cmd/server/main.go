@@ -3,6 +3,7 @@ package main
 import (
 	"arbokcore/core/database"
 	"arbokcore/core/files"
+	"arbokcore/core/supervisors"
 	"arbokcore/core/tokens"
 	"arbokcore/pkg/blobstore"
 	"arbokcore/pkg/brokers"
@@ -143,6 +144,18 @@ func main() {
 	subscriber := brokers.NewSSEBroker("file_events")
 	subscriber.Start(context.Background())
 
+	metadataProducer, err := brokers.SetupFileEventProducer(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	syncer := brokers.NewFileUpdateSyncBroker(
+		"",
+		metadataProducer,
+		&brokers.SSEConsumer{Dst: subscriber},
+	)
+	syncer.Start(context.Background())
+
 	// Routes
 	router := e.Group("arbokcore")
 
@@ -169,7 +182,7 @@ func main() {
 			subscriber.Unsubscribe(ctx, _topicName)
 		}(topicName)
 
-		// ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(1 * time.Second)
 
 		for {
 			select {
@@ -183,53 +196,39 @@ func main() {
 					continue
 				}
 
-				fmt.Fprintf(w, "data: %s\n\n", "userID:"+userID+",deviceID:"+deviceID+",key:"+string(data.Content))
+				sseData := fmt.Sprintf(
+					"userID:%s,deviceID:%s,%s", userID, deviceID, string(data.Content))
+
+				fmt.Fprintf(w, "data: %s\n\n", sseData)
 				w.Flush()
+			case <-ticker.C:
+				fmt.Println("checking for file updates to device")
+				syncer.HandleDemand(ctx, supervisors.Demand{Count: 1, UserID: userID})
 			}
 		}
 
 	}, authsvc.ValidateAccessToken)
 
-	go func() {
-		ctx := context.Background()
-		ticker := time.NewTicker(5 * time.Second)
-
-		for {
-			select {
-			case <-ticker.C:
-				subscriber.SendMessage(ctx, brokers.Message{
-					UserID:   tokens.AdminToken.ResourceID,
-					DeviceID: "1",
-					Content:  []byte("file_id:1|status:success"),
-				})
-
-				subscriber.SendMessage(ctx, brokers.Message{
-					UserID:   tokens.AdminToken.ResourceID,
-					DeviceID: "2",
-					Content:  []byte("file_id:2|status:success"),
-				})
-			}
-		}
-	}()
+	// go func() {
+	// 	ctx := context.Background()
+	// 	ticker := time.NewTicker(5 * time.Second)
 	//
-	// connBrokers.SendMessage(ctx, ssebroker.Message{
-	// 	UserID:   tokens.AdminToken.ResourceID,
-	// 	DeviceID: "2",
-	// 	Content:  []byte("file_id:2|status:success"),
-	// })
-
-	// connBrokers.SendMessage(ctx, ssebroker.Message{
-	// 	UserID:   tokens.AnotherToken.ResourceID,
-	// 	DeviceID: "1",
-	// 	Content:  []byte("file_id:3|status:success"),
-	// })
-	// connBrokers.SendMessage(ctx, ssebroker.Message{
-	// 	UserID:   tokens.AnotherToken.ResourceID,
-	// 	DeviceID: "2",
-	// 	Content:  []byte("file_id:4|status:success"),
-	// })
+	// 	for {
+	// 		select {
+	// 		case <-ticker.C:
+	// 			subscriber.SendMessage(ctx, brokers.Message{
+	// 				UserID:   tokens.AdminToken.ResourceID,
+	// 				DeviceID: "1",
+	// 				Content:  []byte("file_id:1|status:success"),
+	// 			})
+	//
+	// 			subscriber.SendMessage(ctx, brokers.Message{
+	// 				UserID:   tokens.AdminToken.ResourceID,
+	// 				DeviceID: "2",
+	// 				Content:  []byte("file_id:2|status:success"),
+	// 			})
+	// 		}
 	// 	}
-	//
 	// }()
 
 	e.PATCH("/my/files/:fileID",

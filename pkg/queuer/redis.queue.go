@@ -101,7 +101,7 @@ func (slf *RedisQ) ReadMsg(ctx context.Context, partition string, key string) (d
 	queue := templating.NewTemplateString(slf.topicName)(partition)
 	log.Info().Str("q", queue).Msg("reading messages from queue")
 
-	results, err := slf.conn.BLPop(ctx, slf.timeout, slf.topicName).Result()
+	results, err := slf.conn.BLPop(ctx, slf.timeout, queue).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			// log.Info().Msg("no results in queue")

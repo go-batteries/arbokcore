@@ -7,23 +7,28 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type MetadataUpdateConsumerProducer struct {
+type MetadataUpdateConsumer struct {
 	queue  queuer.Queuer
-	demand chan int
+	demand chan Demand
 }
 
-func NewMetadataNotifier(queue queuer.Queuer) *MetadataUpdateConsumerProducer {
-	return &MetadataUpdateConsumerProducer{
+type Demand struct {
+	Count  int
+	UserID string
+}
+
+func NewMetadataNotifier(queue queuer.Queuer) *MetadataUpdateConsumer {
+	return &MetadataUpdateConsumer{
 		queue:  queue,
-		demand: make(chan int, 1),
+		demand: make(chan Demand, 1),
 	}
 }
 
-func (slf *MetadataUpdateConsumerProducer) Demand(val int) {
+func (slf *MetadataUpdateConsumer) Demand(val Demand) {
 	slf.demand <- val
 }
 
-func (slf *MetadataUpdateConsumerProducer) Produce(ctx context.Context, userID string) chan []*queuer.Payload {
+func (slf *MetadataUpdateConsumer) Produce(ctx context.Context) chan []*queuer.Payload {
 	resultsCh := make(chan []*queuer.Payload, 1)
 
 	go func() {
@@ -35,8 +40,8 @@ func (slf *MetadataUpdateConsumerProducer) Produce(ctx context.Context, userID s
 			case d := <-slf.demand:
 				var results []*queuer.Payload
 
-				for i := 0; i < d; i++ {
-					payload, err := slf.queue.ReadMsg(ctx, userID, "metadatasync_consumer")
+				for i := 0; i < d.Count; i++ {
+					payload, err := slf.queue.ReadMsg(ctx, d.UserID, "")
 					if err != nil {
 						log.Error().Err(err).Msg("failed to fetch from redis. ignoring")
 						return

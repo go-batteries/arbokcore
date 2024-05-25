@@ -16,7 +16,9 @@ type User struct {
 	database.Timestamp
 }
 
-const UserTypeNormal = "normal"
+const (
+	UserTypeNormal = "normal"
+)
 
 var (
 	ErrIDGenerationFailed = errors.New("id_gen_failed")
