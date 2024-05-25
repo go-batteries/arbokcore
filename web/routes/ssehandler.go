@@ -68,18 +68,20 @@ func (slf *SSEHandler) EstablishConnection(c echo.Context) error {
 	topicName := fmt.Sprintf("%s_%s", userID, deviceID)
 	receiver := slf.subscriber.Subscribe(ctx, topicName)
 
-	defer func(_topicName string) {
-		fmt.Println("deregistering", topicName, userID, deviceID)
-		slf.subscriber.Unsubscribe(ctx, _topicName)
-	}(topicName)
+	defer func(deviceChan chan *brokers.Message) {
+		fmt.Println("deregistering", topicName, deviceChan)
+		slf.subscriber.Unsubscribe(ctx, deviceChan)
+	}(receiver)
 
 	fmt.Println("subscribing", topicName, userID, deviceID)
 	ticker := time.NewTicker(1 * time.Second)
 
 	for {
+		fmt.Println("running")
+
 		select {
 		case <-ctx.Done():
-			fmt.Println("done")
+			fmt.Println("doneeee")
 			return c.NoContent(http.StatusRequestTimeout)
 		case data, ok := <-receiver:
 			// fmt.Println(data, ok)

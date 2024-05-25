@@ -3,6 +3,7 @@ package supervisors
 import (
 	"arbokcore/pkg/queuer"
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 )
@@ -45,6 +46,7 @@ func (slf *MetadataUpdateConsumer) Produce(ctx context.Context) chan []*queuer.P
 				for i := 0; i < d.Count; i++ {
 					payload, err := slf.queue.ReadMsg(ctx, d.UserID, "")
 					if err != nil {
+						fmt.Println("errror ", err)
 						log.Error().Err(err).Msg("failed to fetch from redis. ignoring")
 						return
 					}
