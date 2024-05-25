@@ -12,6 +12,8 @@ type MetadataUpdateConsumer struct {
 	demand chan Demand
 }
 
+// Since for each users device, we will be demanding the messages on the
+// Q, with each tick in the loop in the /subscribe API.
 type Demand struct {
 	Count  int
 	UserID string

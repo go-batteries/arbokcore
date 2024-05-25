@@ -60,6 +60,10 @@ func MetdataSupervisor(ctx context.Context, cfg config.AppConfig) error {
 
 	chunkRepo := files.NewUserFileRespository(dbconn, chunkQueryStore)
 
+	// Here, in the worker, After the metadata worker has updated the
+	// current_flag to true for the new fileID, it can again enqueue into a different
+	// queue.
+
 	supervisors.MetadataSupervisor(
 		ctx,
 		repo,

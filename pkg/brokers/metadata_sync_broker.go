@@ -65,9 +65,25 @@ func (r *SSEConsumer) Execute(ctx context.Context, payloads []*queuer.Payload) e
 		str := "fileID:" + cachedData.FileID
 		fmt.Println(str)
 
+		// TODO: get all devices for user
+
 		r.Dst.SendMessage(ctx, Message{
 			UserID:   cachedData.UserID,
 			DeviceID: cachedData.DeviceID,
+			Content:  []byte(str),
+		})
+
+		// Now I don't have multiple devices yet.
+		// So what I will do is, set another message.
+
+		anotherDevice := "2"
+		if cachedData.DeviceID == "2" {
+			anotherDevice = "1"
+		}
+
+		r.Dst.SendMessage(ctx, Message{
+			UserID:   cachedData.UserID,
+			DeviceID: anotherDevice,
 			Content:  []byte(str),
 		})
 	}
@@ -80,7 +96,16 @@ func (slf *FileUpdateSyncBroker) HandleDemand(ctx context.Context, demand superv
 }
 
 func (slf *FileUpdateSyncBroker) Start(ctx context.Context) {
-	pool := workerpool.NewWorkerPool(10, slf.consumer.Execute)
+	// Here what happens is
+	// The producer is running, in for loop, waiting for demand to arrive
+	// In the slf.producer.Demand() call later down the function
+	// send the demand, the producer.Start sends the data on receiveChan
+	// The Dispatcher gets this data on receive chan, and then passes it on to a worker
+	// which executes the consumer.Exevute function
+
+	// This consumer.Execute is responsible for, fetching the devices for a user
+	// And then send them to the SSEBroker channel.
+	pool := workerpool.NewWorkerPool(1, slf.consumer.Execute)
 	recvChan := slf.producer.Produce(ctx)
 
 	go workerpool.Dispatch(ctx, pool, recvChan)
@@ -97,7 +122,7 @@ func (slf *FileUpdateSyncBroker) Start(ctx context.Context) {
 				return
 			case demand, ok := <-slf.demandChan:
 				if ok {
-					fmt.Println("demanding device updates")
+					// fmt.Println("demanding device updates")
 					slf.producer.Demand(demand)
 				}
 			}
@@ -119,6 +144,9 @@ func SetupFileEventProducer(cfg config.AppConfig) (*supervisors.MetadataUpdateCo
 		1*time.Second,
 	)
 
+	//connects to redis q
+	// and reads messages on demand
+	// The demand is sent via a demand chan
 	return supervisors.NewMetadataNotifier(nsq), nil
 }
 

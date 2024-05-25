@@ -36,6 +36,21 @@ func NewMetadataService(
 	}
 }
 
+// Should also deal with shared access
+func (ms *MetadataService) GetFileChunks(ctx context.Context, fileID string) (*FilesWithChunks, error) {
+	filesWithChunks, err := ms.repo.SelectFiles(ctx, []*string{&fileID})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get files with chunks")
+		return nil, errors.New("internal_error:2025:500")
+	}
+
+	if len(filesWithChunks) == 0 {
+		return nil, errors.New("not_found:2027:404")
+	}
+
+	return filesWithChunks[0], nil
+}
+
 func (ms MetadataService) ListOrderedFileChunks(ctx context.Context, fileID string, userID string) ([]string, *FileInfoResponse, error) {
 
 	filesWithChunks, err := ms.repo.SelectFiles(ctx, []*string{&fileID})
@@ -342,10 +357,15 @@ type Response struct {
 	HasMore   bool                `json:"hasMore"`
 }
 
+type PageOpts struct {
+	Offset int
+	Limit  int
+}
+
 func (ms *MetadataService) ListFilesForUser(
 	ctx context.Context,
 	userID string,
-	offset int,
+	pageOpts PageOpts,
 ) api.Response {
 	// This gets the files and their chunks info from file_metadatas and user_files
 	// So the response comes like
@@ -356,7 +376,7 @@ func (ms *MetadataService) ListFilesForUser(
 
 	// We need to convert this to
 	// File: { FileInfo, Chunks: [Chunk1, Chunk2]}
-	files, hasMore, err := ms.repo.ListByUserID(ctx, userID, offset)
+	files, hasMore, err := ms.repo.ListByUserID(ctx, userID, pageOpts)
 	if err != nil {
 		return api.BuildResponse(err, nil)
 	}

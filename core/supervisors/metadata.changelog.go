@@ -266,9 +266,10 @@ func (slf *MetadataExecutor) Execute(ctx context.Context, payloads []*queuer.Pay
 		utils.Dump(cachedData)
 
 		updateSuccessEvents = append(updateSuccessEvents, &notifiers.MetadataUpdateStatusEvent{
-			FileID:   cachedData.ID,
-			UserID:   cachedData.UserID,
-			DeviceID: cachedData.DeviceID,
+			FileID:     cachedData.ID,
+			UserID:     cachedData.UserID,
+			DeviceID:   cachedData.DeviceID,
+			PrevFileID: cachedData.PrevID,
 		})
 	}
 
@@ -374,7 +375,7 @@ func MetadataSupervisor(
 	executor := NewMetadataExecutor(repo, crepo, notifier)
 
 	// WorkerPool that will Process each Redis Message
-	pool := workerpool.NewWorkerPool(10, executor.Execute)
+	pool := workerpool.NewWorkerPool(1, executor.Execute)
 	recvChan := producer.Produce(ctx)
 
 	go workerpool.Dispatch(ctx, pool, recvChan)

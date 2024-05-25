@@ -47,6 +47,7 @@ func (handler *MetadataHandler) MarkUploadComplete(c echo.Context) error {
 
 	log.Info().Msg("deviceID: " + token.DeviceID)
 	data := tokens.UserFileDevice{FileID: token.ResourceID, DeviceID: token.DeviceID}
+
 	resp := handler.FileSvc.MarkUploadComplete(ctx, &data)
 	if !resp.Success {
 		return c.JSON(resp.Error.HttpStatus, resp)
@@ -169,7 +170,34 @@ func WriteSessionCookie(c echo.Context, maxAge int, key string, value string) {
 	c.SetCookie(cookie)
 }
 
-func (handler *MetadataHandler) GetFileMetadata(c echo.Context) error {
+func (handler *MetadataHandler) GetFileChunks(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
+	if !ok {
+		log.Error().Msg("current token is not set")
+		return c.NoContent(http.StatusForbidden)
+	}
+
+	fileID := c.Param("fileID")
+	if fileID == "" {
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	// Check if user has access to file
+	_ = token
+
+	fileWithChunks, err := handler.FileSvc.GetFileChunks(ctx, fileID)
+	resp := api.BuildResponse(err, fileWithChunks)
+	if err != nil {
+		return c.JSON(resp.Error.HttpStatus, resp)
+	}
+
+	return c.JSON(http.StatusOK, resp)
+
+}
+
+func (handler *MetadataHandler) ListFilesWithMetadata(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
@@ -183,7 +211,16 @@ func (handler *MetadataHandler) GetFileMetadata(c echo.Context) error {
 		offset = 0
 	}
 
-	resp := handler.FileSvc.ListFilesForUser(ctx, token.ResourceID, offset)
+	limit, err := strconv.Atoi(c.QueryParam("limit"))
+	if err != nil {
+		limit = 0
+	}
+
+	resp := handler.FileSvc.ListFilesForUser(
+		ctx,
+		token.ResourceID,
+		files.PageOpts{Offset: offset, Limit: limit},
+	)
 
 	if resp.Success {
 		return c.JSON(http.StatusOK, resp)

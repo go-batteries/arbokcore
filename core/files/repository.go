@@ -302,7 +302,7 @@ const DefaultLimit = 20
 func (slf *MetadataRepository) ListByUserID(
 	ctx context.Context,
 	userID string,
-	offset int,
+	pageOpts PageOpts,
 ) ([]*FilesWithChunks, bool, error) {
 
 	hasMore := false
@@ -312,7 +312,11 @@ func (slf *MetadataRepository) ListByUserID(
 		return nil, hasMore, errors.New("query_retriever_failed:2001:500")
 	}
 
-	stmt := fmt.Sprintf(stmtTmpl, DefaultLimit+1, offset)
+	if pageOpts.Limit == 0 {
+		pageOpts.Limit = DefaultLimit
+	}
+
+	stmt := fmt.Sprintf(stmtTmpl, pageOpts.Limit+1, pageOpts.Offset)
 	log.Debug().Msg(stmt)
 
 	rows, err := slf.conn.NamedQueryContext(
@@ -340,9 +344,9 @@ func (slf *MetadataRepository) ListByUserID(
 		results = append(results, metadata)
 	}
 
-	hasMore = len(results) > DefaultLimit
+	hasMore = len(results) > pageOpts.Limit
 
-	return results, hasMore, nil
+	return results[0:pageOpts.Limit], hasMore, nil
 }
 
 type MetadataTokenRepository struct {

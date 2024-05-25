@@ -14,6 +14,7 @@ type MetadataUpdateStatus struct {
 	queue queuer.Queuer
 }
 
+// New File Updated Notification queue
 func NewMedataUpdateStatus(queue queuer.Queuer) *MetadataUpdateStatus {
 	return &MetadataUpdateStatus{
 		queue: queue,
@@ -21,9 +22,10 @@ func NewMedataUpdateStatus(queue queuer.Queuer) *MetadataUpdateStatus {
 }
 
 type MetadataUpdateStatusEvent struct {
-	FileID   string
-	UserID   string
-	DeviceID string
+	FileID     string
+	UserID     string
+	PrevFileID *string
+	DeviceID   string
 }
 
 type PayloadMap struct {
@@ -63,6 +65,7 @@ func (ms *MetadataUpdateStatus) Notify(ctx context.Context, events []*MetadataUp
 			continue
 		}
 
+		// Enqueue fileID changes for user device notifications
 		err := ms.queue.EnqueueMsg(ctx, payload.userID, &payload.payload)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to enqueue messages")
