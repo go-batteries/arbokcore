@@ -143,15 +143,10 @@ func (b *SSEBroker) Start(ctx context.Context) {
 					continue
 				}
 
-				fmt.Println("=========")
-				fmt.Println("=========")
-				fmt.Println(msg)
-				fmt.Println("=========")
-				fmt.Println("=========")
-
 				ch := findTopicByName(topics, msg.Key())
 				if ch == nil {
 					fmt.Println("no channels active for topic", msg.Key())
+					continue
 				}
 
 				select {

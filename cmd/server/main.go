@@ -173,7 +173,7 @@ func main() {
 	e.GET("/my/files/:fileID/download",
 		metadataHandler.DownloadFile,
 		authsvc.AddTokenFromUrlToHeader,
-		authsvc.ValidateStreamToken,
+		authsvc.ValidateAccessToken,
 	)
 
 	srv := &http.Server{

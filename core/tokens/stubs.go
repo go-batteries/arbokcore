@@ -13,8 +13,8 @@ var AdminToken = Token{
 	TokenType:    "user",
 	DeviceID:     "1",
 
-	AccessExpiresAt:  database.Now().Add(1 * time.Hour),
-	RefreshExpiresAt: database.Now().Add(5 * time.Hour),
+	AccessExpiresAt:  time.Now().Add(1 * time.Hour),
+	RefreshExpiresAt: time.Now().Add(5 * time.Hour),
 
 	Timestamp: database.NewTimestamp(),
 }
@@ -27,8 +27,8 @@ var AnotherToken = Token{
 	TokenType:    "user",
 	DeviceID:     "2",
 
-	AccessExpiresAt:  database.Now().Add(1 * time.Hour),
-	RefreshExpiresAt: database.Now().Add(5 * time.Hour),
+	AccessExpiresAt:  time.Now().Add(1 * time.Hour),
+	RefreshExpiresAt: time.Now().Add(5 * time.Hour),
 
 	Timestamp: database.NewTimestamp(),
 }

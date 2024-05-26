@@ -67,7 +67,7 @@ func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	fileID := c.Param("fileID")
-	downloadUrls, infoResp, err := handler.FileSvc.ListOrderedFileChunks(ctx, fileID, *token.UserID)
+	downloadUrls, infoResp, err := handler.FileSvc.ListOrderedFileChunks(ctx, fileID, token.ResourceID)
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get files chunks")

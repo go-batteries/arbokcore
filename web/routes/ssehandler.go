@@ -90,12 +90,6 @@ func (slf *SSEHandler) EstablishConnection(c echo.Context) error {
 				continue
 			}
 
-			fmt.Println("==================")
-			fmt.Println("==================")
-			fmt.Println(string(data.Content), deviceID)
-			fmt.Println("==================")
-			fmt.Println("==================")
-
 			sseData := fmt.Sprintf(
 				"userID:%s,deviceID:%s,%s", userID, deviceID, string(data.Content))
 
