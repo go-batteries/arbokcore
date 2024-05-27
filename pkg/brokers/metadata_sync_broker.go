@@ -105,7 +105,7 @@ func (slf *FileUpdateSyncBroker) Start(ctx context.Context) {
 
 	// This consumer.Execute is responsible for, fetching the devices for a user
 	// And then send them to the SSEBroker channel.
-	pool := workerpool.NewWorkerPool(1, slf.consumer.Execute)
+	pool := workerpool.NewWorkerPool(1, slf.consumer.Execute, false)
 	recvChan := slf.producer.Produce(ctx)
 
 	go workerpool.Dispatch(ctx, pool, recvChan)

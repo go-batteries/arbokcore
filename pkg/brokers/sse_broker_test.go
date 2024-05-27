@@ -41,8 +41,8 @@ func Test_BrokerSubscription(t *testing.T) {
 		return done
 	}
 
-	collect := func(done chan bool) chan Message {
-		results := make(chan Message)
+	collect := func(done chan bool) chan *Message {
+		results := make(chan *Message)
 
 		go func() {
 			defer close(results)
@@ -62,7 +62,7 @@ func Test_BrokerSubscription(t *testing.T) {
 		return results
 	}
 
-	messages := []Message{}
+	messages := []*Message{}
 	done := make(chan bool)
 
 	generator(10)
@@ -75,7 +75,7 @@ func Test_BrokerSubscription(t *testing.T) {
 
 	require.Equal(t, 10, len(messages))
 
-	topics := rho.Map(messages, func(message Message, _ int) string {
+	topics := rho.Map(messages, func(message *Message, _ int) string {
 		return message.Key()
 	})
 

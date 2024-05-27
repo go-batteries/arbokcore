@@ -3,6 +3,7 @@ package workerpool
 import (
 	"context"
 	"log"
+	"sync"
 )
 
 type Result struct {
@@ -20,7 +21,7 @@ type WorkerPool[E any, V any] struct {
 	ResultChs []chan V
 }
 
-func NewWorkerPool[E, V any](poolSize int64, processorFunc ProcessorFunc[E, V]) *WorkerPool[E, V] {
+func NewWorkerPool[E, V any](poolSize int64, processorFunc ProcessorFunc[E, V], captureResult bool) *WorkerPool[E, V] {
 
 	pool := &WorkerPool[E, V]{
 		Pool:      make(chan chan E, poolSize),
@@ -31,10 +32,11 @@ func NewWorkerPool[E, V any](poolSize int64, processorFunc ProcessorFunc[E, V]) 
 
 	for i := 0; i < int(poolSize); i++ {
 		workers = append(workers, &Worker[E, V]{
-			ID:        i + 1,
-			Bench:     make(chan E, 1), //Job Chan
-			Processor: processorFunc,   // Worker ProcessorFunc
-			Quit:      make(chan bool),
+			ID:            i + 1,
+			Bench:         make(chan E, 1), //Job Chan
+			Processor:     processorFunc,   // Worker ProcessorFunc
+			Quit:          make(chan bool),
+			captureResult: captureResult,
 		})
 	}
 
@@ -96,22 +98,35 @@ func Merge[V any](ctx context.Context, chans []chan V, out chan<- V) {
 		return
 	}
 
+	var wg sync.WaitGroup
+
 	for _, ch := range chans {
-		go func(ch chan V) {
-			select {
-			case result := <-ch:
-				out <- result
+		wg.Add(1)
+		go func(c chan V) {
+			defer wg.Done()
+			for v := range c {
+				select {
+				case out <- v:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}(ch)
 	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
 }
 
 type Worker[E, V any] struct {
-	ID         int
-	WorkerPool *WorkerPool[E, V]
-	Bench      chan E // Job channel
-	Processor  ProcessorFunc[E, V]
-	Quit       chan bool
+	ID            int
+	WorkerPool    *WorkerPool[E, V]
+	Bench         chan E // Job channel
+	Processor     ProcessorFunc[E, V]
+	Quit          chan bool
+	captureResult bool
 }
 
 func (w *Worker[E, V]) Start(ctx context.Context) chan V {
@@ -129,10 +144,19 @@ func (w *Worker[E, V]) Start(ctx context.Context) chan V {
 			select {
 
 			case job := <-w.Bench:
-				log.Printf("worker:%d", w.ID)
+				// log.Printf("worker:%d", w.ID)
 				result := w.Processor(ctx, job)
-				_ = result
-				// resultCh <- result
+				if !w.captureResult {
+					continue
+				}
+
+				select {
+				case resultCh <- result:
+					// log.Println("sending result", result)
+				case <-ctx.Done():
+					return
+				}
+
 			case <-w.Quit:
 				log.Println("quiting")
 				return

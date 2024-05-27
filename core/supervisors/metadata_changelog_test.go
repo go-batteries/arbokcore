@@ -145,7 +145,7 @@ func Test_Supervisor(t *testing.T) {
 	t.Skip()
 
 	ctx := context.Background()
-	pool := workerpool.NewWorkerPool(2, Execute)
+	pool := workerpool.NewWorkerPool(2, Execute, true)
 	outChan := make(chan []*queuer.Payload, 1)
 	demand := make(chan int, 1)
 

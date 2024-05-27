@@ -375,7 +375,7 @@ func MetadataSupervisor(
 	executor := NewMetadataExecutor(repo, crepo, notifier)
 
 	// WorkerPool that will Process each Redis Message
-	pool := workerpool.NewWorkerPool(1, executor.Execute)
+	pool := workerpool.NewWorkerPool(1, executor.Execute, false)
 	recvChan := producer.Produce(ctx)
 
 	go workerpool.Dispatch(ctx, pool, recvChan)
