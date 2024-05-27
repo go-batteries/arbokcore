@@ -1,0 +1,8 @@
+arbokcli:
+  image: localhost/arbokcli:latest
+  volumes:
+    - ./dockerdb:/app/dbs
+  args:
+    BUILD_VERSION: ${BUILD_VERSION}
+  command: "migrate -dir up"
+  entrypoint: ["/app/arbokcli"]

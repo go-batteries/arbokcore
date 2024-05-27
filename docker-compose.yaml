@@ -3,7 +3,7 @@ version: '3.8'
 
 services:
   server1:
-    build: .
+    image: localhost/arbokcore:latest
     environment:
       - SERVER_ID=server1
     ports:
@@ -11,16 +11,16 @@ services:
     expose:
       - "9191"
     volumes:
-      - ./dockerdb:/app
+      - ./dockerdb:/app/dbs
     networks:
       - app-network
 
   server2:
-    build: .
+    image: localhost/arbokcore:latest
     environment:
       - SERVER_ID=server2
     volumes:
-      - ./dockerdb:/app
+      - ./dockerdb:/app/dbs
     ports:
       - "9192:9191"
     expose:
@@ -29,16 +29,20 @@ services:
       - app-network
 
   arbokcli:
-    build:
-      context: .
-      dockerfile: cli.Dockerfile
-      args:
-        BUILD_VERSION: ${BUILD_VERSION}
-    volumes:
-      - ./dockerdb:/app
-    images: arbokcli
+    entrypoint: ["echo", "not implemented"]
     networks:
       - app-network
+
+  arbokworker:
+    image: localhost/arbokworker:latest
+    command: "supervise -name metadatas"
+    args:
+      BUILD_VERSION: ${BUILD_VERSION}
+    volumes:
+      - ./dockerdb:/app/dbs
+    networks:
+      - app-network
+
 
 volumes:
   dockerdb:

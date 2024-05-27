@@ -13,3 +13,14 @@ build.testdata:
 	openssl rand -base64 $((100*1024*1024)) | head -c $((24*1024*1024)) > tmp/testdata/24mb.txt
 	openssl rand -base64 $((100*1024*1024)) | head -c $((33*1024*1024)) > tmp/testdata/33mb.txt
 	openssl rand -base64 $((100*1024*1024)) | head -c $((4*1024*1024)) > tmp/testdata/4mb.txt
+
+
+build.images:
+	podman build -t arbokcore -f Dockerfile .
+	podman build -t arbokcli -f cli.Dockerfile .
+	podman build -t arbokworker -f worker.Dockerfile .
+
+
+# localhost/arbokcore:latest
+# localhost/arbokcli:latest
+# localhost/arbokworker:latest
