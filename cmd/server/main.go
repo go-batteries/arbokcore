@@ -96,9 +96,12 @@ func main() {
 	}
 
 	chunkSvc := files.NewFileChunkService(chunkRepo, localFs)
+	downloadSvc := files.NewDownloadHandler(redisConn)
 
-	metadataHandler := &routes.MetadataHandler{FileSvc: filesvc}
+	metadataHandler := &routes.MetadataHandler{FileSvc: filesvc, Downloader: downloadSvc}
 	chunkHandler := &routes.ChunkHandler{ChunkSvc: chunkSvc}
+
+	shareHandler := &routes.ShareHandler{}
 
 	// Echo instance
 	e := echo.New()
@@ -170,8 +173,19 @@ func main() {
 		authsvc.ValidateStreamToken,
 	)
 
+	e.PUT("/my/files/:fileID/share",
+		shareHandler.ShareFile,
+		authsvc.ValidateAccessToken,
+	)
+
 	e.GET("/my/files/:fileID/download",
 		metadataHandler.DownloadFile,
+		authsvc.AddTokenFromUrlToHeader,
+		authsvc.ValidateAccessToken,
+	)
+
+	e.GET("/my/files/:fileID/v2/download",
+		metadataHandler.DownloadFileV2,
 		authsvc.AddTokenFromUrlToHeader,
 		authsvc.ValidateAccessToken,
 	)

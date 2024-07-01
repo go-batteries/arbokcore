@@ -2,19 +2,16 @@
 
 Backend core for file storage system.
 
-
 This service handles chunked file uploads and downloads. So when you re-upload the same file:
 
 - if possible, it updates only updated chunks
 - otherwise, upload the file in short chunks of 4MB, transferred in groups of 3
-
 
 ## Requirements
 
 - go v1.22.0
 - redis
 - sqlite3
-
 
 ## Starting
 
@@ -23,9 +20,7 @@ This service handles chunked file uploads and downloads. So when you re-upload t
 - `make run.server` to run the server
 - `make run.supervise.worker` to run the worker
 
-
-
-## Overview:
+## Overview
 
 ![Overview](./FileManagementSystems.svg)
 
@@ -33,7 +28,9 @@ Working:
 
 ![Flow](./FileManagementCore.svg)
 
+Sharing:
 
+![Sharing](./FileShare.svg)
 
 [Verisoning with Slowly changing dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
 

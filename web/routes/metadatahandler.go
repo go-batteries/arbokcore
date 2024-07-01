@@ -17,7 +17,8 @@ import (
 )
 
 type MetadataHandler struct {
-	FileSvc *files.MetadataService
+	FileSvc    *files.MetadataService
+	Downloader *files.DownloadHandler
 }
 
 const (
@@ -55,6 +56,51 @@ func (handler *MetadataHandler) MarkUploadComplete(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, resp)
 
+}
+
+func (handler *MetadataHandler) DownloadFileV2(c echo.Context) error {
+	token, ok := c.Get(middlewares.TokenContextKey).(*tokens.Token)
+	if !ok {
+		log.Error().Msg("token validation not done")
+		return c.NoContent(http.StatusUnauthorized)
+	}
+
+	ctx := c.Request().Context()
+
+	fileID := c.Param("fileID")
+	downloadUrls, infoResp, err := handler.FileSvc.ListOrderedFileChunks(ctx, fileID, token.ResourceID)
+
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get files chunks")
+		resp := api.BuildResponse(err, nil)
+		return c.JSON(resp.Error.HttpStatus, resp)
+	}
+
+	buffer, err := handler.Downloader.Download(ctx, infoResp.Size, downloadUrls)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to download file")
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	log.Info().Int("buffer len", buffer.Len()).Msg("total size of buffer")
+
+	outputFilePath := fmt.Sprintf("./tmp/outdir/%s", infoResp.Name)
+	outputFile, err := os.Create(outputFilePath)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to create output file")
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	defer outputFile.Close()
+	defer os.Remove(outputFilePath)
+
+	_, err = io.Copy(outputFile, buffer)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to write to output file")
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.Attachment(outputFilePath, infoResp.Name)
 }
 
 func (handler *MetadataHandler) DownloadFile(c echo.Context) error {
