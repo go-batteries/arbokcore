@@ -1,6 +1,6 @@
 # arbokcore
 
-Backend core for file storage system.
+Backend core for file storage system. Frontend at [arbok](https://github.com/go-batteries/arbok)
 
 This service handles chunked file uploads and downloads. So when you re-upload the same file:
 
